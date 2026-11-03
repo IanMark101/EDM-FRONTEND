@@ -13,7 +13,7 @@ npm ci
 npm run dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000). Set `CLINIC_API_ORIGIN` for the frontend process if the API is on a different local port. Use the same browser hostname when signing in and opening the workspace.
+Open [http://localhost:3000](http://localhost:3000). Copy `frontend/.env.example` to `frontend/.env.local` to configure the backend address. Set `CLINIC_API_ORIGIN` there and restart the frontend after editing it. Use the same browser hostname when signing in and opening the workspace.
 
 Run `npm run build` for the production build or `npm run typecheck` to check types. Third-party notices are in [docs/THIRD_PARTY_NOTICES.md](docs/THIRD_PARTY_NOTICES.md).
 
