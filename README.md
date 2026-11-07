@@ -19,6 +19,12 @@ Run `npm run build` for the production build or `npm run typecheck` to check typ
 
 Run `npm test` to check API cookie forwarding and failure handling without connecting to the backend. The frontend adds the Secure attribute to cookies returned over HTTPS, including when its API connection uses local HTTP.
 
+## Vercel deployment
+
+Import `EDM-FRONTEND` from GitHub and select the Next.js preset. Set **Root Directory** to `frontend`, enable **Include source files outside of the Root Directory**, and use `npm run build`. Leave the output directory on the Next.js default. The build uses the root npm workspace and `shared/` types.
+
+Set the server-only variable `CLINIC_API_ORIGIN` to your Railway HTTPS origin, for example `https://your-care-record-api.up.railway.app`. Add your Vercel production origin to `CLINIC_FRONTEND_ORIGINS` in Railway before signing in. Keep database credentials in Railway. The browser uses the Vercel project's own `/api` routes and the server forwards them to Railway.
+
 ## Set service prices before new billing
 
 Sign in as the account manager and open **Service prices**. Add the clinic-approved consultation price and each laboratory test price. Use the same test names that doctors request. Managers can edit or disable a price; changes require a reason and keep an activity record.
@@ -27,7 +33,7 @@ Billing's **Prepare bill** screen lists completed services with their approved p
 
 Saved bill lines show their service and price sources. Earlier bills keep their amounts and payment controls, with a clear label where historical source references were not recorded. Updating the price list does not recalculate saved charges.
 
-Use the updated backend with this frontend. No database migration or automatic price seeding is needed. `npm test` also renders the actual billing components to check approved-price display, missing-price blocking and compatibility with earlier invoices.
+Use the updated backend with this frontend. Service prices use the existing settings table. Run the backend migrations for the patient portal. `npm test` also renders the actual billing components to check approved-price display, missing-price blocking and compatibility with earlier invoices.
 
 ## Refresh and save recovery
 
