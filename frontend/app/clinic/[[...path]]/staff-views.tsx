@@ -110,6 +110,8 @@ export function Billing({ data, open }: Props) {
   const bills = data.invoices.filter(b => (tab === 'outstanding' ? b.paid < b.total : tab === 'paid' ? b.paid >= b.total : true) && matches(query, patientFor(data, b.patientId)?.name, b.id)).sort((a, b) => b.date.localeCompare(a.date));
   const prepare = (v: any) => open({ kind: 'invoice-new', visit: v, patient: patientFor(data, v.patientId) });
   return <><PageHeading title="Billing & payments" description={`${unbilled.length} ${unbilled.length === 1 ? 'visit needs' : 'visits need'} a bill. ${outstanding.length} ${outstanding.length === 1 ? 'bill has' : 'bills have'} a remaining balance.`} />
+    <p className="notice-inline">Charges come from completed consultations and approved tests. The account manager sets their prices; you check the bill and record payment.</p>
+    {!data.priceList?.entries.some(price => price.active) && <p className="notice-inline">Ask the account manager to add service prices before preparing new charges. Existing bills can still receive payments.</p>}
     <WorkTabs value={tab} onChange={setTab} tabs={[{ id: 'to-bill', label: 'To bill', count: unbilled.length }, { id: 'outstanding', label: 'Unpaid & partly paid', count: outstanding.length }, { id: 'paid', label: 'Paid bills' }, { id: 'all', label: 'All bills' }]} />
     <Toolbar search={query} setSearch={setQuery} label="Find a patient, visit or bill" count={tab === 'to-bill' ? visits.length : bills.length} />
     {tab === 'to-bill' ? <WorkTable rows={visits} empty="No visits waiting for a bill" detail="A visit appears here after the doctor completes the consultation. Existing bills remain in the payment lists." columns={[
@@ -182,8 +184,4 @@ export function StaffAccounts({ data, open }: Props) {
     { label: 'Action', action: true, render: s => s.id === data.user.id ? <span className="muted">Your account</span> : action('Manage access', () => open({ kind: 'staff-edit', row: s })) },
   ]} /><div className="next-step-note"><ShieldCheck size={17} />Changing a role or disabling an account ends its active sessions.</div></>;
 }
-export function ActivityHistory({ data }: { data: WorkspaceData }) {
-  const [query, setQuery] = useState(''); const [limit, setLimit] = useState(30);
-  const rows = data.history.filter(h => matches(query, h.actor, h.action, h.entityId, h.detail));
-  return <><PageHeading title="Activity history" description={data.user.role === 'manager' ? 'Staff account changes and sign-in activity.' : 'Who accessed, changed, approved or exported records, and when.'} /><Toolbar search={query} setSearch={setQuery} label="Find a staff member, action or record" count={rows.length} /><div className="activity-list">{rows.slice(0, limit).map(h => <details className="history-row" key={h.id}><summary><span className="history-dot" /><span><strong>{h.action}</strong><small>{h.actor} · {h.entityId}</small></span><time>{formatTime(h.at)}</time></summary><div className="history-detail"><p>{h.detail}</p><small>{ROLE_NAMES[h.role as Role]}</small></div></details>)}</div>{!rows.length && <Empty title="No matching activity" />}{rows.length > limit && <button className="button button-secondary" onClick={() => setLimit(n => n + 30)}>Show more activity</button>}</>;
-}
+export { ActivityHistory } from './activity-history';

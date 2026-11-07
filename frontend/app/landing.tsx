@@ -80,7 +80,7 @@ export function Landing() {
     <Footer brand={<Brand />} description="Patient visits, laboratory reports and payments, connected for your clinic." copyright={`© ${new Date().getFullYear()} CareRecord. All rights reserved.`} columns={[
       { title: 'Patient care', links: [{ label: 'Patient visits', href: '#workflow' }, { label: 'Test report checks', href: '#checks' }, { label: 'Saved documents', href: '#documents' }] },
       { title: 'Connected records', links: [{ label: 'Staff access', href: '#responsibilities' }, { label: 'Reports & analytics', href: '#reporting' }, { label: 'Common questions', href: '#questions' }] },
-      { title: 'Workspace', links: [{ label: 'Staff sign-in', href: '/login' }, { label: 'Back to top', href: '#landing-top' }] },
+      { title: 'Workspace', links: [{ label: 'Staff sign-in', href: '/login' }, { label: 'Patient sign-in', href: '/patient' }, { label: 'Back to top', href: '#landing-top' }] },
     ]} />
   </div>;
 }

@@ -13,6 +13,7 @@
     "dev": "npm run dev --workspace @care-record/frontend",
     "build": "npm run build --workspace @care-record/frontend",
     "start": "npm run start --workspace @care-record/frontend",
-    "typecheck": "npm run typecheck --workspace @care-record/frontend"
+    "typecheck": "npm run typecheck --workspace @care-record/frontend",
+    "test": "npm run test --workspace @care-record/frontend"
   }
 }

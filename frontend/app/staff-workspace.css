@@ -75,6 +75,27 @@
 .report-review-prompt { display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px 20px; margin-bottom:20px; padding-block:10px; font-size:14px; color:var(--forest); }
 .invoice-extra-action { flex-wrap:wrap; gap:12px; }
 .account-form { max-width:560px; }
+.service-price-editor { max-width:640px; margin:24px 0 32px; padding:24px; border:1px solid var(--border); border-radius:8px; background:var(--surface); }
+.service-price-editor h2, .service-prices-empty h2 { font-size:18px; margin:0 0 18px; }
+.service-price-editor input[readonly] { background:var(--ground); }
+.price-table-detail { display:block; color:var(--muted); font-size:12px; margin-top:5px; }
+.service-prices-empty { padding:30px 0; max-width:560px; }
+.service-prices-empty p { color:var(--muted); line-height:1.7; }
+.billing-service-options { display:grid; gap:12px; margin:20px 0; }
+.billing-service-option { display:grid; grid-template-columns:18px minmax(0,1fr) auto; gap:12px; align-items:start; padding:16px; border:1px solid var(--border); border-radius:8px; cursor:pointer; }
+.billing-service-option:has(input:checked) { border-color:var(--sage); background:var(--sage-pale); }
+.billing-service-option input { margin:4px 0 0; }
+.billing-service-option>span { min-width:0; }
+.billing-service-option>span>strong { display:block; font-size:14px; font-weight:500; }
+.billing-service-option small { display:block; color:var(--muted); font-size:12px; line-height:1.7; margin-top:4px; overflow-wrap:anywhere; }
+.billing-service-option .price-needed { color:var(--warning); }
+.service-approved-price { font-size:14px; font-weight:500; white-space:nowrap; }
+.billing-service-option.needs-price { background:var(--ground); cursor:default; }
+.charge-origin { display:block; color:var(--muted); font-size:12px; line-height:1.7; margin-top:6px; overflow-wrap:anywhere; }
+.charge-origin summary { cursor:pointer; }
+.charge-origin p { margin:6px 0; }
+.bill-line-service { min-width:0; }
+@media(max-width:600px) { .service-price-editor { padding:18px; }.billing-service-option { grid-template-columns:18px minmax(0,1fr); padding:14px; }.service-approved-price { grid-column:2; }.billing-service-option>span>strong { font-size:14px; } }
 .account-form h2, .operation-guidance h2 { font-size:18px; margin:0 0 14px; }
 .account-form h3, .operation-guidance h3 { font-size:15px; margin-top:24px; }
 .operations-layout { display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1fr); gap:48px; align-items:start; }
@@ -242,6 +263,52 @@
   .notification-popover button { min-height:40px; }
   [data-notification-menu] button { min-height:44px; }
 }
+
+.history-filters { padding-bottom:20px; border-bottom:1px solid var(--rule); }
+.history-search { display:flex; align-items:center; justify-content:space-between; gap:16px; margin-bottom:18px; }
+.staff-app .history-search .search-field { width:min(420px,100%); }
+.history-search > span, .history-filter-actions > span { font-size:12px; }
+.history-filter-fields { display:grid; grid-template-columns:minmax(150px,1fr) minmax(180px,1.4fr) repeat(2,minmax(145px,.85fr)); gap:14px; }
+.history-filter-fields .field { margin-bottom:14px; }
+.history-filter-actions { display:flex; gap:16px; align-items:center; flex-wrap:wrap; }
+.history-filter-actions > span { margin-left:auto; }
+.history-pagination { display:flex; flex-wrap:wrap; gap:16px; align-items:center; padding:18px 0; border-bottom:1px solid var(--rule); font-size:12px; color:var(--muted); }
+.history-result-count { margin-right:auto; }
+.history-page-size { display:flex; align-items:center; gap:8px; }
+.staff-app .history-page-size select { width:72px; min-height:36px; padding:6px 9px; font-size:12px; }
+.history-pagination nav { display:flex; align-items:center; gap:12px; }
+.history-pagination .button { padding:8px 11px; min-height:36px; font-size:12px; }
+.history-loading > div { padding:22px 0; border-bottom:1px solid var(--rule); }
+.history-loading span { display:block; width:38%; height:12px; background:var(--raised); border-radius:4px; }
+.history-loading span + span { width:25%; height:9px; margin-top:10px; }
+@media (max-width:1100px) { .history-filter-fields { grid-template-columns:repeat(2,minmax(0,1fr)); } }
+@media (max-width:600px) {
+  .history-search { align-items:flex-start; flex-direction:column; gap:8px; }
+  .history-filter-fields { gap:8px 12px; }
+  .history-filter-actions > span { margin-left:0; width:100%; }
+  .history-pagination { gap:12px; }
+  .history-pagination nav { width:100%; justify-content:space-between; gap:8px; }
+  .history-pagination nav > span { white-space:nowrap; }
+}
+
+.patient-login-switch { margin-top:16px; }
+.login-help a { margin-left:6px; text-decoration:underline; text-underline-offset:3px; }
+.patient-portal { min-height:100svh; background:var(--raised); padding:0 clamp(16px,5vw,64px) 32px; }
+.patient-portal-header { max-width:960px; margin:0 auto; display:flex; align-items:center; justify-content:space-between; gap:12px; padding:18px 0; }
+.patient-portal-sheet { max-width:960px; margin:0 auto; padding:clamp(18px,4vw,40px); min-height:430px; border:1px solid var(--border); border-radius:16px; background:#fff; }
+.patient-portal-sheet .work-tabs button { display:inline-flex; gap:7px; align-items:center; }
+.portal-list { display:grid; gap:12px; margin-top:18px; }
+.portal-record { padding:16px 18px; border:1px solid var(--rule); border-radius:8px; min-width:0; overflow-wrap:anywhere; }
+.portal-record h2, .portal-record h3, .portal-record summary strong { font-size:15px; }
+.portal-record > p, .portal-record summary > span { display:block; margin:5px 0 10px; font-size:13px; color:var(--muted); }
+.portal-record summary { cursor:pointer; }
+.portal-record summary > span { margin-bottom:0; }
+.portal-record[open] summary { margin-bottom:12px; }
+.portal-values { margin:12px 0; font-size:14px; }
+.portal-values > div { display:flex; justify-content:space-between; gap:16px; padding:9px 0; border-top:1px solid var(--rule); }
+.portal-values dd { text-align:right; }
+.portal-values small { display:block; font-size:12px; color:var(--muted); }
+.portal-values .portal-balance { padding:10px; background:var(--sage-pale); border:0; border-radius:6px; font-weight:600; }
 
 /* Sign-in: the brand panel has one shared center line, separate from form labels. */
 .login-story { display:grid; grid-template-columns:minmax(0,1fr); grid-template-rows:auto minmax(0,1fr) auto; justify-content:stretch; justify-items:center; text-align:center; padding:46px 48px 32px; }

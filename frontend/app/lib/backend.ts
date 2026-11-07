@@ -13,8 +13,18 @@ export async function backendRequest(request: Request): Promise<Response> {
     const response = await fetch(target, { method: request.method, headers,
       body: ['GET', 'HEAD'].includes(request.method) ? undefined : await request.arrayBuffer(),
       redirect: 'manual', cache: 'no-store', signal: AbortSignal.timeout(30_000) });
-    return new Response(response.body, response);
+    const responseHeaders = new Headers(response.headers);
+    responseHeaders.delete('set-cookie');
+    for (const cookie of response.headers.getSetCookie()) {
+      // The browser-facing connection can be HTTPS even with a local HTTP API.
+      responseHeaders.append('set-cookie', incoming.protocol === 'https:' && !/;\s*secure\s*(?:;|$)/i.test(cookie) ? `${cookie}; Secure` : cookie);
+    }
+    return new Response(response.body, { status: response.status, statusText: response.statusText, headers: responseHeaders });
   } catch {
-    return Response.json({ error: 'The clinic service is unavailable. Start the backend and try again.' }, { status: 503, headers: { 'Cache-Control': 'no-store' } });
+    const reading = ['GET', 'HEAD'].includes(request.method);
+    return Response.json({
+      code: reading ? 'CLINIC_UNAVAILABLE' : 'SAVE_NOT_CONFIRMED',
+      error: reading ? 'The clinic service is unavailable. Start the backend and try again.' : 'The clinic connection was interrupted. Refresh the records to check whether your change was saved before trying again.',
+    }, { status: 503, headers: { 'Cache-Control': 'no-store', 'Retry-After': '1' } });
   }
 }

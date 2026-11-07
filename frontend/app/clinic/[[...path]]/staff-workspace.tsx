@@ -13,11 +13,14 @@ import { WorkflowDialog } from './workflow-dialog';
 import { Reception, Consultations, Laboratory, Billing, PatientRegister, ReviewWork, Sources, StaffAccounts, ActivityHistory, PatientWork } from './staff-views';
 import { AccountSettings, OperationsSettings } from './account-settings';
 import { AnalyticsWorkspace } from './analytics-workspace';
+import { ServicePrices } from './service-prices';
+import { PatientAccess } from './patient-access';
+import type { ServicePriceList } from '@shared/billing';
 
 export type WorkspaceData = {
   user: any; patients: any[]; visits: any[]; labs: any[]; invoices: any[]; reviews: any[];
   imports: any[]; facts: any[]; runs: any[]; staff: any[]; history: any[]; generatedAt: string;
-  notifications: SavedNotification[]; billingServices: any[]; quality?: any;
+  notifications: SavedNotification[]; billingServices: any[]; quality?: any; priceList?: ServicePriceList;
 };
 export type ModalState = { kind: string; row?: any; patient?: any; visit?: any } | null;
 export type OpenTask = (task: NonNullable<ModalState>) => void;
@@ -33,6 +36,7 @@ const NAV = [
   { slug: 'sources', label: 'Department imports', icon: Database, roles: ['laboratory', 'billing', 'reviewer'] },
   { slug: 'staff', label: 'Staff accounts', icon: UsersRound, roles: ['manager'] },
   { slug: 'operations', label: 'Clinic operations', icon: ShieldCheck, roles: ['manager'] },
+  { slug: 'prices', label: 'Service prices', icon: ReceiptText, roles: ['manager'] },
   { slug: 'history', label: 'Activity history', icon: History, roles: ['manager', 'reviewer'] },
 ];
 
@@ -120,6 +124,7 @@ export function ClinicApp({ localNotificationPort }: { localNotificationPort?: s
   if (!permitted) content = <><h1>Access restricted</h1><Empty title="This work belongs to another staff role" action={<Link className="button button-secondary" href={`/clinic/${HOME[role]}`}>Return to my work</Link>} /></>;
   else if (slug === 'account') content = <AccountSettings user={data.user} />;
   else if (slug === 'operations') content = <OperationsSettings />;
+  else if (slug === 'prices') content = <ServicePrices data={data} reload={reload} notify={setNotice} onPriceSaved={priceList => setData(current => current ? { ...current, priceList } : current)} />;
   else if (slug === 'reception') content = <Reception data={data} open={open} />;
   else if (slug === 'visits') content = <Consultations data={data} open={open} />;
   else if (slug === 'laboratory') content = <Laboratory data={data} open={open} />;
@@ -127,6 +132,7 @@ export function ClinicApp({ localNotificationPort }: { localNotificationPort?: s
   else if (slug === 'patients' && patientId) {
     const patient = data.patients.find(p => p.id === patientId);
     content = patient ? <><Link className="back-link" href={`/clinic/${HOME[role]}`}><ArrowLeft size={16} />Back to my work</Link><div className="page-heading"><div><h1>{patient.name}</h1><p>Patient {patient.id}</p></div>{['registration', 'reviewer'].includes(role) && <button className="button button-secondary" onClick={() => open({ kind: 'patient-edit', row: patient })}>Correct patient details</button>}</div><IdentityCard patient={patient} doctor={data.staff.find(d => d.id === patient.doctorId)?.name} />{['registration', 'doctor', 'reviewer'].includes(role) && <p className="patient-contact">Contact number: {patient.phone || 'Not provided'}</p>}<PatientWork data={data} patient={patient} open={open} /><details className="form-disclosure"><summary>Record details</summary><p>Source: {patient.source || 'Clinic registration'} · Version {patient.version} · Updated {formatTime(patient.updatedAt)}</p></details></> : <Empty title="This patient is not available to your account" />;
+    if (role === 'registration' && patient) content = <>{content}<PatientAccess key={patient.id} patientId={patient.id} notify={setNotice} /></>;
   } else if (slug === 'patients') content = <><PageHeading title={role === 'doctor' ? 'Assigned patients' : 'Patient register'} description={role === 'doctor' ? 'Patient records assigned to your care.' : 'Find the patient identification available for your work.'} /><PatientRegister data={data} open={open} /></>;
   else if (slug === 'review') content = <ReviewWork data={data} open={open} />;
   else if (slug === 'sources') content = <Sources data={data} open={open} />;
