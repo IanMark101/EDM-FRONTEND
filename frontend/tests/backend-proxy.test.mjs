@@ -45,3 +45,11 @@ test('a lost upstream save response advises checking records without forwarding 
   assert.equal(response.status, 503); const payload = await response.json();
   assert.equal(payload.code, 'SAVE_NOT_CONFIRMED'); assert.match(payload.error, /check whether your change was saved/); assert.equal(attempts, 1);
 });
+
+test('oversized JSON requests stop at the byte limit even without a content length', async context => {
+  const upstream = context.mock.method(globalThis, 'fetch', async () => { throw new Error('Oversized request was forwarded'); });
+  const body = new ReadableStream({ start(controller) { controller.enqueue(new TextEncoder().encode('é'.repeat(50_001))); } });
+  const response = await backendRequest(new Request('http://127.0.0.1:3000/api/imports', { method: 'POST', body, duplex: 'half' }));
+  assert.equal(response.status, 413);
+  assert.equal(upstream.mock.callCount(), 0);
+});

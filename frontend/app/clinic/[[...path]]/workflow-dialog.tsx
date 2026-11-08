@@ -64,6 +64,7 @@ function RecordWorkflowDialog({ modal, data, onClose, onSaved }: WorkflowProps) 
       else if (kind === 'staff-new' || kind === 'staff-edit') { path = kind === 'staff-new' ? 'staff' : `staff/${row.id}`; body = form; message = kind === 'staff-new' ? 'Staff account created with an assigned role.' : 'Staff access updated. Existing sessions for that account have ended.'; }
       else if (kind === 'import') { const parsed = JSON.parse(raw); path = 'imports'; body = { source: role, records: Array.isArray(parsed) ? parsed : parsed.records }; }
       const result = await clinicRequest(path, body);
+      if (kind === 'checkin' && result.alreadyWaiting) message = `This patient already has an open visit: ${result.id}.`;
       if (kind === 'import') message = `${result.imported} received, ${result.held} held for checking, ${result.skipped} existing copies skipped.`;
       await onSaved(message, kind === 'patient-new' ? { kind: 'checkin', patient: { ...form, id: result.id } } : kind === 'invoice-add' ? { kind: 'invoice', row } : kind === 'visit' && action === 'request-test' ? { kind: 'lab-new', patient: initialPatient, visit: row } : undefined);
     } catch (e) { setError(e instanceof SyntaxError ? 'This file is not valid JSON. Use the sample format or check the file.' : e instanceof Error ? e.message : 'The record could not be saved.'); setBusy(false); }
@@ -71,7 +72,7 @@ function RecordWorkflowDialog({ modal, data, onClose, onSaved }: WorkflowProps) 
   let title = '', fields: ReactNode;
   if (kind === 'checkin') {
     title = 'Check in for a visit';
-    const active = data.visits.find(v => v.patientId === form.patientId && (v.status === 'waiting' || v.date === today() && v.status === 'draft'));
+    const active = data.visits.find(v => v.patientId === form.patientId && (v.status === 'waiting' || v.status === 'draft'));
     fields = <>{initialPatient && <IdentityCard patient={initialPatient} doctor={data.staff.find(d => d.id === initialPatient.doctorId)?.name} />}<p className="form-intro">{active ? `This patient already has an active visit: ${active.id}. Another check-in is not needed.` : 'Confirm the patient has arrived. This visit will be sent to the assigned doctor.'}</p><div className="simple-row"><span>Visit date</span><strong>{formatDate(form.date)}</strong></div>{active ? <div className="form-actions"><button type="button" className="button button-secondary" onClick={onClose}>Close</button></div> : footer('Check in patient')}</>;
   } else if (kind === 'cancel-checkin') {
     title = 'Cancel check-in';

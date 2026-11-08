@@ -3,13 +3,12 @@ import { useEffect } from 'react';
 
 export function useNotificationUpdates(staffId: string | undefined, localPort: string | undefined, reload: () => Promise<void>) {
   useEffect(() => {
-    if (!staffId) return;
+    // Hosted workspaces use the existing authenticated HTTP refresh.
+    if (!staffId || !localPort || window.location.protocol !== 'http:' || !['localhost', '127.0.0.1', '[::1]'].includes(window.location.hostname)) return;
 
     const endpoint = new URL('/api/notifications/live', window.location.origin);
-    if (localPort && endpoint.protocol === 'http:' && ['localhost', '127.0.0.1', '[::1]'].includes(endpoint.hostname)) {
-      endpoint.port = localPort;
-    }
-    endpoint.protocol = endpoint.protocol === 'https:' ? 'wss:' : 'ws:';
+    endpoint.port = localPort;
+    endpoint.protocol = 'ws:';
 
     let socket: WebSocket | undefined;
     let timer: ReturnType<typeof setTimeout> | undefined;
