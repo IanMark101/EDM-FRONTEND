@@ -31,8 +31,8 @@ export function Login({ patient = false }: { patient?: boolean }) {
       <section className="login-story" aria-label={patient ? 'CareRecord patient portal' : 'CareRecord clinic workspace'}>
         <Brand light />
         <div className="login-introduction">
-          <h1>{patient ? <>Your care<br />in one place</> : <>A clear record<br />of care</>}</h1>
-          <p>{patient ? 'See your completed visits, released test results and bills.' : 'The right information, with the people responsible for it.'}</p>
+          <p className="login-story-title">{patient ? <>Your care<br />in one place</> : <>A clear record<br />of care</>}</p>
+          <p className="login-story-description">{patient ? 'See your completed visits, released test results and bills.' : 'The right information, with the people responsible for it.'}</p>
           <div className="login-coverage" aria-label="Connected clinic work">
             <span>Patient records</span>
             <span>Laboratory reports</span>
@@ -44,7 +44,7 @@ export function Login({ patient = false }: { patient?: boolean }) {
       <section className="login-form-side">
         <Link href="/" className="back-link"><ArrowLeft size={16} />Back to home</Link>
         <div className="login-form-wrap">
-          <h2>{patient ? activating ? 'Set up patient access' : 'Patient sign-in' : 'Staff sign-in'}</h2>
+          <h1>{patient ? activating ? 'Set up patient access' : 'Patient sign-in' : 'Staff sign-in'}</h1>
           <p>{patient ? activating ? 'Use the patient number and setup code from Registration.' : 'Use your patient number and password.' : 'Use the account assigned to you.'}</p>
           {expired && <p className="notice-inline" role="status">Your session ended. Please sign in again.</p>}
           {!patient && passwordChanged && <p className="notice-inline" role="status">Password changed. Sign in with your new password.</p>}
@@ -54,13 +54,13 @@ export function Login({ patient = false }: { patient?: boolean }) {
               <input id="staff-username" autoComplete="username" value={username} onChange={e => setUsername(e.target.value)} required placeholder={patient ? 'Your patient number' : 'Your staff username'} maxLength={80} />
             </label>
             {patient && activating && <label className="field" htmlFor="patient-code"><span>Setup code</span><input id="patient-code" value={code} onChange={e => setCode(e.target.value)} required maxLength={64} autoComplete="off" spellCheck={false} /></label>}
-            <label className="field" htmlFor="staff-password">
-              <span>{activating ? 'Choose a password' : 'Password'}</span>
+            <div className="field">
+              <label htmlFor="staff-password">{activating ? 'Choose a password' : 'Password'}</label>
               <div className="password-field">
                 <input id="staff-password" autoComplete={activating ? 'new-password' : 'current-password'} type={visible ? 'text' : 'password'} value={password} onChange={e => setPassword(e.target.value)} minLength={activating ? 12 : undefined} maxLength={200} required />
                 <button type="button" className="icon-button" onClick={() => setVisible(!visible)} aria-label={visible ? 'Hide password' : 'Show password'}>{visible ? <EyeOff size={18} /> : <Eye size={18} />}</button>
               </div>
-            </label>
+            </div>
             {error && <p className="form-error" role="alert">{error}</p>}
             <button className="button button-primary button-full" disabled={busy}>{busy ? 'Please wait…' : activating ? 'Activate account' : 'Sign in'}<ArrowRight size={16} /></button>
           </form>

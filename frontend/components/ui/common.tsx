@@ -1,5 +1,5 @@
 'use client';
-import { useEffect, useId, useRef, Children, isValidElement, cloneElement, type ReactNode, type ReactElement } from 'react';
+import { useEffect, useId, useRef, useState, Children, isValidElement, cloneElement, type ReactNode, type ReactElement } from 'react';
 import Link from 'next/link';
 import { Activity, X, Search, ArrowRight, CircleCheck, CircleAlert, Clock3 } from 'lucide-react';
 
@@ -31,10 +31,60 @@ export function Field({ label, children, hint, error }: { label: string; childre
     ? cloneElement(child as ReactElement<any>, { id, 'aria-describedby': described, 'aria-invalid': error ? true : undefined }) : child);
   return <label className={`field ${error ? 'field-invalid' : ''}`} htmlFor={id}><span>{label}</span>{controls}{hint && <small id={`${id}-hint`}>{hint}</small>}{error && <small className="field-error" id={`${id}-error`} role="alert">{error}</small>}</label>;
 }
-export function Dialog({ title, children, onClose }: { title: string; children: ReactNode; onClose: () => void }) {
-  const ref = useRef<HTMLDialogElement>(null); const titleId = useId();
+type DialogProps = {
+  title: string; children: ReactNode; onClose: () => void; hasUnsavedChanges?: boolean; busy?: boolean;
+  pendingChange?: { proceed: () => void; cancel: () => void };
+};
+export function Dialog({ title, children, onClose, hasUnsavedChanges = false, busy = false, pendingChange }: DialogProps) {
+  const ref = useRef<HTMLDialogElement>(null);
+  const discardRef = useRef<HTMLDialogElement>(null);
+  const keepRef = useRef<HTMLButtonElement>(null);
+  const focusBeforeDiscard = useRef<HTMLElement | null>(null);
+  const titleId = useId();
+  const discardId = useId();
+  const [confirmClose, setConfirmClose] = useState(false);
+  const confirming = confirmClose || !!pendingChange;
   useEffect(() => { const dialog = ref.current; const previous = document.body.style.overflow; document.body.style.overflow = 'hidden'; dialog?.showModal(); return () => { dialog?.close(); document.body.style.overflow = previous; }; }, []);
-  return <dialog ref={ref} className="dialog" aria-labelledby={titleId} onCancel={e => { e.preventDefault(); onClose(); }} onClick={e => { if (e.target === e.currentTarget) onClose(); }}><div className="dialog-header"><h2 id={titleId}>{title}</h2><button type="button" className="icon-button" onClick={onClose} aria-label="Close dialog"><X size={20} /></button></div><div className="dialog-content">{children}</div></dialog>;
+  useEffect(() => {
+    if (!confirming) return;
+    const dialog = discardRef.current;
+    focusBeforeDiscard.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    dialog?.showModal();
+    keepRef.current?.focus();
+    return () => dialog?.close();
+  }, [confirming]);
+  function requestClose() {
+    if (busy) return;
+    if (hasUnsavedChanges) setConfirmClose(true);
+    else onClose();
+  }
+  function keepEditing() {
+    discardRef.current?.close();
+    focusBeforeDiscard.current?.focus();
+    setConfirmClose(false);
+    pendingChange?.cancel();
+  }
+  function discardChanges() {
+    discardRef.current?.close();
+    if (pendingChange) pendingChange.proceed();
+    else onClose();
+  }
+  return <>
+    <dialog ref={ref} className="dialog" aria-labelledby={titleId} onCancel={e => { e.preventDefault(); requestClose(); }} onClick={e => { if (e.target === e.currentTarget) requestClose(); }}>
+      <div className="dialog-header"><h2 id={titleId}>{title}</h2><button type="button" className="icon-button" disabled={busy} onClick={requestClose} aria-label="Close dialog"><X size={20} /></button></div>
+      <div className="dialog-content">{children}</div>
+    </dialog>
+    {confirming && <dialog ref={discardRef} className="dialog discard-dialog" role="alertdialog" aria-labelledby={discardId} aria-describedby={`${discardId}-detail`} onCancel={e => { e.preventDefault(); keepEditing(); }}>
+      <div className="dialog-content">
+        <h2 id={discardId}>Discard unsaved changes?</h2>
+        <p id={`${discardId}-detail`}>Any entries you have made since opening this form will be lost.</p>
+        <div className="form-actions">
+          <button ref={keepRef} type="button" className="button button-primary" onClick={keepEditing}>Keep editing</button>
+          <button type="button" className="button button-secondary discard-button" onClick={discardChanges}>Discard changes</button>
+        </div>
+      </div>
+    </dialog>}
+  </>;
 }
 export function TextLink({ href, children }: { href: string; children: ReactNode }) { return <Link className="text-link" href={href}>{children}<ArrowRight size={15} aria-hidden="true" /></Link>; }
 export function IdentityCard({ patient, doctor }: { patient: any; doctor?: string }) {

@@ -23,6 +23,10 @@ export function InvoiceChargeDialog({ modal, data, onClose, onSaved }: { modal: 
   const [selected, setSelected] = useState(() => offers.filter(offer => offer.price).slice(0, 12).map(offer => offer.source.key));
   const [date, setDate] = useState(clinicDay()); const [reason, setReason] = useState('');
   const [busy, setBusy] = useState(false); const [error, setError] = useState('');
+  const [cancelRequested, setCancelRequested] = useState(false);
+  const [initial] = useState(() => ({ selected, date }));
+  const hasUnsavedChanges = date !== initial.date || reason !== '' ||
+    selected.length !== initial.selected.length || selected.some(key => !initial.selected.includes(key));
   const chosen = offers.filter(offer => selected.includes(offer.source.key) && offer.price);
   const total = chosen.reduce((sum, offer) => sum + offer.price!.amount, 0);
   const consultationIncluded = adding || chosen.some(offer => offer.source.kind === 'consultation');
@@ -33,7 +37,9 @@ export function InvoiceChargeDialog({ modal, data, onClose, onSaved }: { modal: 
       await onSaved(adding ? 'Completed services added at the approved prices.' : 'Bill created using the account manager’s approved prices.', adding ? { kind: 'invoice', row: invoice } : undefined);
     } catch (error) { setError(error instanceof Error ? error.message : 'The bill could not be saved.'); setBusy(false); }
   }
-  return <Dialog title={adding ? 'Add completed services' : 'Prepare bill'} onClose={() => { if (!busy) onClose(); }}><form onSubmit={save}>
+  return <Dialog title={adding ? 'Add completed services' : 'Prepare bill'} onClose={onClose} busy={busy} hasUnsavedChanges={hasUnsavedChanges} pendingChange={cancelRequested ? {
+    proceed: onClose, cancel: () => setCancelRequested(false),
+  } : undefined}><form onSubmit={save}>
     {patient && <IdentityCard patient={patient} />}{visit && <div className="record-summary"><span>Visit {visit.id}</span><span>{formatDate(visit.date)}</span></div>}
     <p className="form-intro">Choose completed services. Prices come from the account manager’s approved list.</p>
     {adding && invoice.items.some((item: any) => !item.source?.key) && <p className="notice-inline">This bill contains earlier charges without service links. Check its saved charges before adding another service.</p>}
@@ -51,6 +57,6 @@ export function InvoiceChargeDialog({ modal, data, onClose, onSaved }: { modal: 
     <div className="bill-total"><span>{adding ? 'Additional charges' : 'Total charges'}</span><strong>{formatMoney(total)}</strong></div>
     {adding && <p className="source-line">Existing saved charges and payments keep their amounts.</p>}
     {error && <div className="form-error" role="alert"><p>{error}</p><p>Close this window and refresh the work list to review the latest prices and services.</p></div>}
-    <div className="form-actions"><button type="button" className="button button-secondary" disabled={busy} onClick={onClose}>Cancel</button><button className="button button-primary" disabled={busy || !chosen.length || chosen.length > 12 || !consultationIncluded || quote.version === undefined}>{busy ? 'Saving…' : adding ? 'Add selected services' : 'Create bill'}</button></div>
+    <div className="form-actions"><button type="button" className="button button-secondary" disabled={busy} onClick={() => { if (hasUnsavedChanges) setCancelRequested(true); else onClose(); }}>Cancel</button><button className="button button-primary" disabled={busy || !chosen.length || chosen.length > 12 || !consultationIncluded || quote.version === undefined}>{busy ? 'Saving…' : adding ? 'Add selected services' : 'Create bill'}</button></div>
   </form></Dialog>;
 }

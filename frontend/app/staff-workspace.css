@@ -159,13 +159,22 @@
 .payment-preview strong { font-size:18px; font-variant-numeric:tabular-nums; }
 .invoice-extra-action { display:flex; justify-content:flex-end; margin:-8px 0 14px; }
 .dialog .form-actions { position:sticky; bottom:0; background:#fff; padding-block:12px; z-index:2; }
+.discard-dialog { width:min(424px, calc(100% - 24px)); }
+.discard-dialog p { margin-top:8px; color:var(--muted); }
+.dialog.discard-dialog .form-actions { position:static; margin-top:18px; padding-bottom:0; }
+.discard-dialog .discard-button { color:var(--negative); }
+.invoice-payment-form { margin-top:24px; padding:18px; border:1px solid var(--border); border-radius:var(--radius-card); background:var(--raised); }
+.invoice-payment-form .form-intro { margin:6px 0 16px; }
+.dialog .invoice-payment-form .form-actions { position:static; margin-top:12px; padding-bottom:0; background:transparent; }
 .import-preview { margin-top:16px; padding:16px; background:var(--raised); border-radius:8px; }
 /* Period receipts are distinct from the present balance of included bills. */
 .analytics-period { display:flex; gap:20px; align-items:center; flex-wrap:wrap; margin-bottom:24px; }
 .date-fields { display:flex; gap:12px; }
 .date-fields .field { margin:0; width:155px; }
-.report-freshness { font-size:12px; color:var(--muted); margin-right:auto; }
-.report-freshness small { display:block; margin-top:4px; font-size:12px; }
+.report-refresh { display:grid; justify-items:end; flex:none; gap:6px; }
+.report-freshness { font-size:12px; color:var(--muted); }
+.analytics-period .date-fields { margin-right:auto; }
+.analytics-period-hint { margin:-12px 0 12px; color:var(--muted); font-size:13px; }
 .analytics-metrics { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); margin:8px 0 20px; padding:20px 0 24px; border-bottom:1px solid var(--border); }
 .analytics-metrics > div { min-width:0; padding:0 20px; border-left:1px solid var(--border); }
 .analytics-metrics > div:first-child { padding-left:0; border-left:0; }
@@ -247,7 +256,8 @@
   .staff-app .history-row time { grid-column:2; padding-bottom:12px; }
   .date-fields { width:100%; }
   .date-fields .field { flex:1; min-width:0; width:auto; }
-  .analytics-period .report-freshness { width:100%; }
+  .report-refresh { justify-items:start; }
+  .invoice-payment-form { padding:14px; }
   .analytics-money > div { flex-wrap:wrap; }
   .analytics-money dd { margin-left:auto; }
   .dialog .invoice-item { grid-template-columns:minmax(0,1fr) 108px 32px; gap:8px; align-items:end; }
@@ -314,23 +324,29 @@
 .login-story { display:grid; grid-template-columns:minmax(0,1fr); grid-template-rows:auto minmax(0,1fr) auto; justify-content:stretch; justify-items:center; text-align:center; padding:46px 48px 32px; }
 .login-story > .brand { justify-content:center; }
 .login-story > .login-introduction { display:flex; flex-direction:column; align-items:center; justify-content:center; padding:56px 0; width:100%; max-width:480px; }
-.login-story .login-introduction h1 { margin:0; max-width:100%; font-size:clamp(44px,4.5vw,68px); line-height:1.07; letter-spacing:-.045em; text-wrap:balance; }
-.login-story .login-introduction h1 br { display:block; }
-.login-story .login-introduction > p { margin:26px auto 0; max-width:31ch; color:#e1e9e0; font-size:16px; line-height:1.65; }
+.login-story .login-introduction .login-story-title { margin:0; max-width:100%; font-size:clamp(44px,4.5vw,68px); line-height:1.07; letter-spacing:-.045em; text-wrap:balance; }
+.login-story .login-introduction .login-story-title br { display:block; }
+.login-story .login-introduction > .login-story-description { margin:26px auto 0; max-width:31ch; color:#e1e9e0; font-size:16px; line-height:1.65; }
 .login-coverage { display:flex; flex-wrap:wrap; justify-content:center; align-items:center; gap:10px 22px; margin-top:42px; max-width:430px; color:#d5e1d3; font-size:13px; line-height:1.7; }
 .login-coverage span { white-space:nowrap; }
 .login-story-footer { text-align:center; font-size:12px; line-height:1.7; }
 @media (min-width:761px) and (max-width:1100px) {
   .login-story { padding:36px 30px 28px; }
-  .login-story .login-introduction h1 { font-size:clamp(40px,4.7vw,52px); }
+  .login-story .login-introduction .login-story-title { font-size:clamp(40px,4.7vw,52px); }
   .login-coverage { gap:12px 18px; }
 }
 @media (max-width:760px) {
   .login-story { display:flex; align-items:center; padding:26px 24px 28px; min-height:0; }
   .login-story > .brand { font-size:26px; }
   .login-story > .login-introduction { padding:24px 0 0; }
-  .login-story .login-introduction h1 { font-size:38px; line-height:1.1; }
-  .login-story .login-introduction > p { font-size:14px; max-width:32ch; margin-top:16px; line-height:1.6; }
+  .login-story .login-introduction .login-story-title { font-size:38px; line-height:1.1; }
+  .login-story .login-introduction > .login-story-description { font-size:14px; max-width:32ch; margin-top:16px; line-height:1.6; }
   .login-coverage { display:none; }
   .login-story-footer { display:none; }
+}
+@media (max-width:480px), (max-width:760px) and (max-height:650px) {
+  .login-story { padding:16px 24px; }
+  .login-story > .login-introduction { display:none; }
+  .login-form-side { padding-top:12px; }
+  .login-form-wrap { padding-top:12px; }
 }
