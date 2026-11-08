@@ -306,21 +306,34 @@ tbody tr:hover { background: #fafbf9; }
 .landing-header nav { display: flex; gap: 30px; align-items: center; font-size: 13px; }
 .landing-header nav a:hover { color: var(--sage-dark); }
 .landing-header .button { min-height: 40px; }
-.clinic-hero { background: var(--ground); border-block: 1px solid var(--border); }
-.clinic-hero-inner { display: grid; grid-template-columns: minmax(0, 2fr) minmax(0, 3fr); align-items: center; gap: clamp(28px, 5vw, 76px); max-width: 1440px; margin-inline: auto; padding: clamp(40px, 6vw, 88px) 4.5vw; }
-.clinic-hero-copy h1 { font-family: var(--display); font-size: clamp(42px, 5.4vw, 76px); font-weight: 400; line-height: 1.08; letter-spacing: -.045em; }
-.clinic-hero-copy p { max-width: 36ch; margin-top: 22px; color: var(--muted); font-size: 16px; line-height: 1.7; }
-.clinic-hero-actions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 26px; }
-.clinic-hero-actions .button { min-height: 44px; }
-.clinic-hero-preview { margin: 0; min-width: 0; }
-.clinic-hero-preview img { display: block; width: 100%; height: auto; border: 1px solid var(--border); border-radius: var(--radius-card); background: var(--surface); box-shadow: 0 16px 40px #2c3b3114; }
-.clinic-hero-preview figcaption { margin-top: 10px; color: var(--muted); font-size: 12px; }
-@media (max-width: 760px) {
-  .clinic-hero-inner { grid-template-columns: minmax(0, 1fr); gap: 24px; padding: 32px clamp(18px, 5.5vw, 36px); }
-  .clinic-hero-copy h1 { font-size: clamp(38px, 10vw, 52px); }
-  .clinic-hero-copy p { margin-top: 14px; font-size: 15px; }
-  .clinic-hero-actions { margin-top: 18px; }
-  .clinic-hero-actions .button { padding-inline: 12px; }
+.orbital-hero { --orbit-radius:500px; --orbit-card-width:212px; --orbit-card-height:120px; position:relative; isolation:isolate; display:grid; place-items:center; width:100%; height:clamp(680px,calc(100svh - 80px),840px); overflow:clip; background:var(--surface); }
+.orbital-gallery { position:absolute; inset:0; pointer-events:none; }
+.orbital-ring { position:absolute; left:50%; top:50%; width:0; height:0; animation:care-orbit 35s linear infinite; will-change:transform; }
+.orbital-position { position:absolute; width:0; height:0; transform-origin:0 0; }
+.orbital-card { position:absolute; left:calc(var(--orbit-card-width) / -2); top:calc(var(--orbit-card-height) / -2); width:var(--orbit-card-width); height:var(--orbit-card-height); overflow:hidden; background:var(--surface); box-shadow:0 25px 50px -12px #00000040; animation:care-counter-orbit 35s linear infinite; backface-visibility:hidden; will-change:transform; }
+.orbital-card img { display:block; width:100%; height:100%; object-fit:cover; object-position:top; }
+.orbital-copy { position:relative; z-index:1; width:min(600px,calc(100% - 48px)); padding:16px 0; text-align:center; background:var(--surface); }
+.orbital-copy h1 { font-family:var(--display); font-size:clamp(64px,5.8vw,84px); font-weight:400; line-height:1.07; letter-spacing:-.045em; }
+.orbital-copy > p { margin:28px auto 0; max-width:47ch; font-size:16px; line-height:1.75; color:var(--muted); }
+.orbital-actions { display:flex; justify-content:center; align-items:center; flex-wrap:wrap; gap:16px 24px; margin-top:30px; }
+.orbital-actions .button { min-height:46px; padding:12px 22px; }
+.orbital-actions .text-link { min-height:44px; font-size:14px; }
+@keyframes care-orbit { from { transform:rotate(0deg); } to { transform:rotate(360deg); } }
+@keyframes care-counter-orbit { from { transform:rotate(0deg); } to { transform:rotate(-360deg); } }
+@media (prefers-reduced-motion:reduce) { .orbital-ring, .orbital-card { animation:none; will-change:auto; } }
+@media (max-width:1100px) {
+  .orbital-hero { --orbit-radius:440px; --orbit-card-width:176px; --orbit-card-height:100px; }
+  .orbital-copy { width:min(530px,calc(100% - 48px)); }
+  .orbital-copy h1 { font-size:64px; }
+}
+@media (max-width:640px) {
+  .orbital-hero { --orbit-radius:330px; --orbit-card-width:132px; --orbit-card-height:75px; height:720px; }
+  .orbital-copy { width:calc(100% - 40px); max-width:360px; }
+  .orbital-copy h1 { font-size:clamp(43px,12vw,52px); }
+  .orbital-copy > p { font-size:15px; line-height:1.7; margin-top:24px; }
+  .orbital-copy-break { display:none; }
+  .orbital-actions { gap:12px 18px; margin-top:24px; }
+  .orbital-actions .text-link { font-size:13px; }
 }
 .landing-hero { text-align: center; padding: 72px 24px 18px; max-width: 800px; margin: auto; }
 .landing-hero h1 { font-family: var(--display); font-size: clamp(44px,5.8vw,76px); line-height: 1.08; font-weight: 400; letter-spacing: -.045em; }

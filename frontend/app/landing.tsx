@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { ArrowRight } from 'lucide-react';
 import { Brand } from '@/components/ui/common';
 import { ShowcaseFrame } from '@/components/ui/showcase-frame';
-import { LandingHero } from '@/components/ui/landing-hero';
+import { OrbitalGalleryHero } from '@/components/ui/orbital-gallery-hero';
 import { Footer } from '@/components/ui/footer-1';
 import { WorkspacePreview, DemoFragment, VisitJourney, AccessComparison, ReportingPreview, DocumentPreview } from './landing-fragments';
 
@@ -54,7 +54,7 @@ export function Landing() {
       <Link className="text-link" href="/login">Staff sign-in<ArrowRight size={15} /></Link>
     </header>
     <main ref={main}>
-      <LandingHero />
+      <OrbitalGalleryHero />
       <FeatureSections workspacePreview={<div className="visit-workspace-showcase"><ShowcaseFrame>
         <div data-ui>
           {imagesReady ? <div role="tabpanel" id="showcase-panel" aria-labelledby={`showcase-tab-${view}`}>
