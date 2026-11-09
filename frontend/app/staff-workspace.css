@@ -50,8 +50,6 @@
 .staff-app td small, .staff-app .person-link small { font-size:12px; line-height:1.6; }
 .staff-app .row-button { min-height:38px; padding:8px 12px; font-size:13px; }
 .staff-app .row-button:hover { transform:none; }
-.clinical-sections { margin-top:24px; }
-.clinical-sections .work-tabs { gap:20px; }
 .clinical-readout section { margin:20px 0; }
 .clinical-readout h3, .doctor-review h3 { font-size:16px; margin:0 0 8px; }
 .clinical-readout .clinical-notes { margin:0; }
@@ -105,7 +103,6 @@
 @media (max-width:640px) {
   .measurement-main { grid-template-columns:minmax(0,1fr) minmax(0,1fr); gap:12px; }
   .measurement-main > .field:first-child { grid-column:1 / -1; }
-  .clinical-sections .work-tabs { gap:18px; }
   .measurement-options .text-button { min-height:44px; }
   .measurement-results > div { gap:16px; }
   .measurement-results > div > span { min-width:0; max-width:65%; }

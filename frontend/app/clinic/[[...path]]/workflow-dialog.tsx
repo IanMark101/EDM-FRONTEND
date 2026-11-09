@@ -97,9 +97,54 @@ function RecordWorkflowDialog({ modal, data, onClose, onSaved }: WorkflowProps) 
   } else if (kind === 'visit' && row.status === 'cancelled') {
     title = 'Cancelled check-in'; fields = <>{initialPatient && <IdentityCard patient={initialPatient} />}<p className="notice-inline">Registration cancelled this waiting visit. It is no longer on your work list.</p><div className="form-actions"><button type="button" className="button button-secondary" onClick={onClose}>Close</button></div></>;
   } else if (kind === 'visit') {
-    title = 'Consultation'; const p = data.patients.find(p => p.id === row.patientId);
-    const readonly = row.status === 'signed' && !editing || row.doctorId !== data.user.id;
-    fields = <>{p && <IdentityCard patient={p} />}<div className="record-summary"><span>{row.id} · {formatDate(row.date)}</span><Status value={row.status} /></div>{readonly ? <><h3>Reason for visit</h3><p>{row.reason}</p>{row.notes && <><h3>Consultation notes</h3><p className="clinical-notes">{row.notes}</p></>}<ClinicalReadout value={row.clinical} /><p className="source-line">Completed {formatTime(row.signedAt)}. Earlier signed details remain in history.</p>{row.doctorId === data.user.id && <div className="patient-actions"><PrintLink kind="visit" id={row.id} /><button className="button button-secondary" type="button" onClick={() => onSaved('', { kind: 'lab-new', patient: p, visit: row })}>Request a test for this visit</button><button className="text-button" type="button" onClick={() => setEditing(true)}>Record a correction</button></div>}</> : <><Field label="Reason for visit"><input value={form.visitReason} onChange={e => set('visitReason', e.target.value)} maxLength={200} /></Field><details className="form-disclosure" open={row.notes ? true : undefined}><summary>Visit narrative (optional)</summary><Field label="Consultation notes" hint="Keep the visit narrative here. Use the sections below for assessment and plan."><textarea value={form.notes} onChange={e => set('notes', e.target.value)} rows={3} maxLength={5000} /></Field></details>{!structured && <button className="button button-secondary" type="button" onClick={() => setStructured(true)}>Add clinical sections</button>}{structured && <ClinicalFields value={clinical} onChange={setClinical} />}{editing && <Field label="Reason for correction"><textarea required minLength={12} maxLength={1000} rows={3} value={form.reason} onChange={e => set('reason', e.target.value)} /></Field>}{!editing && <details className="form-disclosure laboratory-request-option"><summary>Laboratory test (optional)</summary><p className="form-intro">Request a test when needed. Your current draft is saved before you choose the test.</p><button type="submit" name="action" value="request-test" className="button button-secondary" disabled={busy}>Request test</button></details>}{footer(editing ? 'Complete correction' : 'Complete consultation', editing ? 'correct' : 'sign', !editing ? <><button type="submit" name="action" value="save" className="button button-secondary" disabled={busy}>Save draft</button></> : undefined)}</>}{Array.isArray(row.history) && row.history.length > 0 && <details className="form-disclosure"><summary>Earlier signed versions ({row.history.length})</summary>{row.history.map((h: any, i: number) => <div className="previous-version" key={i}><p className="clinical-notes">{h.notes}</p><ClinicalReadout value={h.clinical} /><small>{h.changedBy} · {formatTime(h.changedAt)}</small><p>Reason: {h.reason}</p></div>)}</details>}</>;
+    title = 'Consultation';
+    const p = data.patients.find(p => p.id === row.patientId);
+    const isResponsibleDoctor = row.doctorId === data.user.id;
+    const readonly = row.status === 'signed' && !editing || !isResponsibleDoctor;
+    fields = <>
+      {p && <IdentityCard patient={p} />}
+      <div className="record-summary"><span>{row.id} · {formatDate(row.date)}</span><Status value={row.status} /></div>
+      {readonly ? <>
+        <h3>Reason for visit</h3>
+        <p>{row.reason}</p>
+        {row.notes && <><h3>Consultation notes</h3><p className="clinical-notes">{row.notes}</p></>}
+        <ClinicalReadout value={row.clinical} />
+        <p className="source-line">Completed {formatTime(row.signedAt)}. Earlier signed details remain in history.</p>
+        {isResponsibleDoctor && <div className="patient-actions">
+          <PrintLink kind="visit" id={row.id} />
+          <button className="button button-secondary" type="button" onClick={() => onSaved('', { kind: 'lab-new', patient: p, visit: row })}>Request a test for this visit</button>
+          <button className="text-button" type="button" onClick={() => setEditing(true)}>Record a correction</button>
+        </div>}
+      </> : <>
+        {!editing && structured && <p className="form-intro">Fill in the three fields below to finish the visit. You can save a draft or request a test first.</p>}
+        <Field label="Reason for visit">
+          <input required value={form.visitReason} onChange={e => set('visitReason', e.target.value)} maxLength={200} />
+        </Field>
+        {structured ? <ClinicalFields value={clinical} onChange={setClinical}>
+          <Field label="Additional notes"><textarea value={form.notes} onChange={e => set('notes', e.target.value)} rows={2} maxLength={5000} /></Field>
+        </ClinicalFields> : <>
+          <Field label="Consultation notes"><textarea required value={form.notes} onChange={e => set('notes', e.target.value)} rows={3} maxLength={5000} /></Field>
+          <button className="button button-secondary" type="button" onClick={() => setStructured(true)}>Add clinical sections</button>
+        </>}
+        {editing && <Field label="Reason for correction">
+          <textarea required minLength={12} maxLength={1000} value={form.reason} onChange={e => set('reason', e.target.value)} />
+        </Field>}
+        {error && <div className="form-error" role="alert"><strong>Unable to save</strong><p>{error}</p></div>}
+        {footer(editing ? 'Complete correction' : 'Complete consultation', editing ? 'correct' : 'sign', !editing ? <>
+          <button type="submit" name="action" value="save" formNoValidate className="button button-secondary" disabled={busy}>Save draft</button>
+          <button type="submit" name="action" value="request-test" formNoValidate className="button button-secondary" disabled={busy}>Request test</button>
+        </> : undefined)}
+      </>}
+      {Array.isArray(row.history) && row.history.length > 0 && <details className="form-disclosure">
+        <summary>Earlier signed versions ({row.history.length})</summary>
+        {row.history.map((h: any, i: number) => <div className="previous-version" key={i}>
+          <p className="clinical-notes">{h.notes}</p>
+          <ClinicalReadout value={h.clinical} />
+          <small>{h.changedBy} · {formatTime(h.changedAt)}</small>
+          <p>Reason: {h.reason}</p>
+        </div>)}
+      </details>}
+    </>;
   } else if (kind === 'lab-new') {
     title = 'Request laboratory test'; fields = <>{patientSelect(true)}<Field label="Test name"><input list="clinic-test-names" value={form.testName} onChange={e => set('testName', e.target.value)} maxLength={120} required /><datalist id="clinic-test-names"><option>Complete blood count</option><option>Blood glucose</option><option>Urinalysis</option><option>Cholesterol</option></datalist></Field><p className="source-line">The request is linked to this patient and visit. Laboratory staff complete and approve the report.</p>{footer('Send request')}</>;
   } else if (kind === 'lab') {
@@ -181,5 +226,5 @@ function RecordWorkflowDialog({ modal, data, onClose, onSaved }: WorkflowProps) 
         <div className="form-actions"><button type="submit" name="action" value="patient-release" className="button button-primary" disabled={busy || !form.releaseConfirmed}>{busy ? 'Saving…' : 'Release to patient'}</button></div>
       </>}
     </section>}
-    {kind !== 'invoice' && error && <div className="form-error" role="alert"><strong>Unable to save</strong><p>{error}</p></div>}</form></Dialog>;
+    {kind !== 'invoice' && kind !== 'visit' && error && <div className="form-error" role="alert"><strong>Unable to save</strong><p>{error}</p></div>}</form></Dialog>;
 }

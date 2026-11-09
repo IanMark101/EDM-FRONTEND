@@ -1,5 +1,5 @@
 'use client';
-import { useState } from 'react';
+import type { ReactNode } from 'react';
 import { Plus, Trash2, Printer } from 'lucide-react';
 import { Field, formatTime } from '@/components/ui/common';
 import { LAB_LAYOUTS, VITAL_FIELDS, templateRows, type Measurement } from '@shared/clinical';
@@ -8,14 +8,44 @@ export const emptyClinical = () => ({ structured: true, history: '', allergyStat
 export function PrintLink({ kind, id, payment, label = 'Print / save PDF' }: { kind: string; id: string; payment?: string; label?: string }) {
   return <a className="button button-secondary row-button" href={`/api/documents/${kind}/${encodeURIComponent(id)}${payment ? `?payment=${encodeURIComponent(payment)}` : ''}`} target="_blank" rel="noopener noreferrer"><Printer size={15} />{label}</a>;
 }
-export function ClinicalFields({ value, onChange }: { value: any; onChange: (value: any) => void }) {
-  const [section, setSection] = useState('consultation');
+export function ClinicalFields({ value, onChange, children }: { value: any; onChange: (value: any) => void; children: ReactNode }) {
   const set = (key: string, text: any) => onChange({ ...value, [key]: text });
-  return <div className="clinical-sections"><div className="work-tabs" role="group" aria-label="Consultation sections">{[['consultation', 'Consultation'], ['context', 'Patient history'], ['measurements', 'Measurements']].map(([key, name]) => <button key={key} type="button" className={section === key ? 'active' : ''} aria-pressed={section === key} onClick={() => setSection(key)}>{name}</button>)}</div>
-    {section === 'consultation' && <><Field label="Examination findings" hint="Record your observations and examination findings."><textarea rows={3} maxLength={5000} value={value.findings} onChange={e => set('findings', e.target.value)} /></Field><Field label="Assessment" hint="Required when completing the consultation. Drafts may remain unfinished."><textarea rows={3} maxLength={5000} value={value.assessment} onChange={e => set('assessment', e.target.value)} /></Field><Field label="Care plan" hint="Record the treatment, advice, referrals and follow-up you decided."><textarea rows={3} maxLength={5000} value={value.plan} onChange={e => set('plan', e.target.value)} /></Field></>}
-    {section === 'context' && <><Field label="Relevant patient history"><textarea rows={3} maxLength={5000} value={value.history} onChange={e => set('history', e.target.value)} /></Field><Field label="Allergy review"><select value={value.allergyStatus} onChange={e => set('allergyStatus', e.target.value)}><option value="unknown">Not yet confirmed</option><option value="none">No known allergies reported</option><option value="recorded">Allergies reported</option></select></Field>{value.allergyStatus === 'recorded' && <Field label="Allergy and reaction details"><textarea rows={3} maxLength={5000} value={value.allergies} onChange={e => set('allergies', e.target.value)} /></Field>}<Field label="Current medicines" hint="Record what the patient reports taking, including relevant doses."><textarea rows={3} maxLength={5000} value={value.medicines} onChange={e => set('medicines', e.target.value)} /></Field></>}
-    {section === 'measurements' && <><p className="form-intro">Enter measurements taken for this visit. Leave measurements that were not taken blank.</p><div className="form-grid">{VITAL_FIELDS.map(([key, label, unit]) => <Field key={key} label={label} hint={unit}><input inputMode="decimal" value={value.vitals?.[key] || ''} maxLength={10} onChange={e => set('vitals', { ...value.vitals, [key]: e.target.value })} /></Field>)}</div></>}
-  </div>;
+  return <>
+    <Field label="Assessment" hint="What did you conclude during the visit?">
+      <textarea required rows={2} maxLength={5000} value={value.assessment} onChange={e => set('assessment', e.target.value)} />
+    </Field>
+    <Field label="Care plan" hint="What should happen next?">
+      <textarea required rows={2} maxLength={5000} value={value.plan} onChange={e => set('plan', e.target.value)} />
+    </Field>
+    <details className="form-disclosure">
+      <summary>More visit details (optional)</summary>
+      <Field label="Examination findings">
+        <textarea rows={2} maxLength={5000} value={value.findings} onChange={e => set('findings', e.target.value)} />
+      </Field>
+      {children}
+      <h3 className="form-section-title">Patient history</h3>
+      <Field label="Relevant patient history">
+        <textarea rows={2} maxLength={5000} value={value.history} onChange={e => set('history', e.target.value)} />
+      </Field>
+      <Field label="Allergies">
+        <select value={value.allergyStatus} onChange={e => set('allergyStatus', e.target.value)}>
+          <option value="unknown">Not yet confirmed</option>
+          <option value="none">No known allergies reported</option>
+          <option value="recorded">Allergies reported</option>
+        </select>
+      </Field>
+      {value.allergyStatus === 'recorded' && <Field label="Allergy and reaction details">
+        <textarea rows={2} maxLength={5000} value={value.allergies} onChange={e => set('allergies', e.target.value)} />
+      </Field>}
+      <Field label="Current medicines">
+        <textarea rows={2} maxLength={5000} value={value.medicines} onChange={e => set('medicines', e.target.value)} />
+      </Field>
+      <h3 className="form-section-title">Measurements taken during this visit</h3>
+      <div className="form-grid">{VITAL_FIELDS.map(([key, label, unit]) => <Field key={key} label={label} hint={unit}>
+        <input inputMode="decimal" value={value.vitals?.[key] || ''} maxLength={10} onChange={e => set('vitals', { ...value.vitals, [key]: e.target.value })} />
+      </Field>)}</div>
+    </details>
+  </>;
 }
 export function ClinicalReadout({ value }: { value: any }) {
   if (!value?.structured) return null;
