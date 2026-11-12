@@ -3,6 +3,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { CalendarDays, FlaskConical, LogOut, ReceiptText, RefreshCw } from 'lucide-react';
 import { Brand, Empty, PageHeading, formatDate, formatMoney, formatTime } from '@/components/ui/common';
 import { clinicRequest } from '@/app/lib/client';
+import { SignOutDialog } from '@/components/ui/sign-out-dialog';
 
 type RecordSet = {
   patient: { id: string; name: string };
@@ -17,7 +18,7 @@ export function PatientRecords() {
   const [tab, setTab] = useState<(typeof tabs)[number]['id']>('visits');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(true);
-  const [signingOut, setSigningOut] = useState(false);
+  const [confirmSignOut, setConfirmSignOut] = useState(false);
   const requestSequence = useRef(0);
   const load = useCallback(async () => {
     const sequence = ++requestSequence.current;
@@ -41,12 +42,12 @@ export function PatientRecords() {
     return () => window.clearTimeout(timer);
   }, [data]);
   async function logout() {
-    requestSequence.current++; setData(null); setSigningOut(true); setLoading(false); setError('');
-    try { await clinicRequest('patient-portal/logout', {}); window.location.assign('/patient'); }
-    catch { setSigningOut(false); setError('Sign-out did not finish. Try signing out again.'); }
+    await clinicRequest('patient-portal/logout', {});
+    requestSequence.current++; setData(null);
+    window.location.assign('/patient');
   }
   return <div className="patient-portal">
-    <header className="patient-portal-header"><Brand /><button type="button" className="button button-secondary" onClick={logout} disabled={signingOut}><LogOut size={16} aria-hidden="true" />{signingOut ? 'Signing out…' : 'Sign out'}</button></header>
+    <header className="patient-portal-header"><Brand /><button type="button" className="button button-secondary" onClick={() => setConfirmSignOut(true)}><LogOut size={16} aria-hidden="true" />Sign out</button></header>
     <main className="patient-portal-sheet">
       <PageHeading title="My care records" description={data ? `${data.patient.name} · ${data.patient.id}` : 'CareRecord patient portal'} action={data && <button type="button" className="button button-secondary" onClick={load} disabled={loading}><RefreshCw size={16} aria-hidden="true" />Refresh records</button>} />
       {error && <p className="form-error" role="alert">{error}{!data && loading === false && !error.startsWith('Sign-out') && <button type="button" className="text-button" onClick={load}>Try again</button>}</p>}
@@ -67,5 +68,6 @@ export function PatientRecords() {
         </details>)}</div> : <Empty title="No bills yet" detail="Bills appear here after the clinic prepares them." />)}
       </>}
     </main>
+    {confirmSignOut && <SignOutDialog onClose={() => setConfirmSignOut(false)} onConfirm={logout} />}
   </div>;
 }

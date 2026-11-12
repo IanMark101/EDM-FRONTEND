@@ -119,10 +119,6 @@ input[type=checkbox] { accent-color: var(--forest); width: 17px; height: 17px; f
 .bill-lines > div, .bill-total { display: flex; justify-content: space-between; align-items: center; gap: 20px; padding: 13px 0; border-bottom: 1px solid var(--rule); }
 .bill-lines strong, .bill-total strong { font-weight: 500; white-space: nowrap; font-variant-numeric: tabular-nums; }
 .bill-total.outstanding { font-size: 17px; background: var(--sage-pale); padding: 14px; margin-top: 12px; border: 0; border-radius: 8px; }
-.import-actions { display: flex; gap: 16px; align-items: center; flex-wrap: wrap; margin: 16px 0; }
-.file-input { display: flex; position: relative; align-items: center; gap: 10px; justify-content: center; background: var(--raised); padding: 18px; border: 1px dashed var(--control); border-radius: 8px; cursor: pointer; margin-bottom: 18px; }
-.file-input input { position: absolute; inset: 0; opacity: 0; width: 100%; cursor: pointer; }
-.source-editor { font-size: 13px; }
 
 /* 1440px = 232px navigation + 8px right inset + 1200px work frame.
    The frame uses 32px equal gutters; every panel spans the same 1136px canvas. */

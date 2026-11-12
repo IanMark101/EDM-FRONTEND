@@ -37,6 +37,17 @@ test('upstream failures return the existing safe unavailable response', async co
   const response = await backendRequest(new Request('http://127.0.0.1:3000/api/data'));
   assert.equal(response.status, 503); assert.equal((await response.text()).includes('Internal connection details'), false);
 });
+test('a read waits through a brief backend restart and returns the recovered records', async context => {
+  let attempts = 0;
+  context.mock.method(globalThis, 'fetch', async () => {
+    if (++attempts < 3) throw new Error('Temporary connection refusal');
+    return Response.json({ labs: [{ id: 'L-PRESERVED' }] });
+  });
+  const response = await backendRequest(new Request('http://127.0.0.1:3000/api/data?refresh=1'));
+  assert.equal(response.status, 200);
+  assert.equal(attempts, 3);
+  assert.deepEqual((await response.json()).labs, [{ id: 'L-PRESERVED' }]);
+});
 
 test('a lost upstream save response advises checking records without forwarding twice', async context => {
   let attempts = 0;

@@ -1,6 +1,6 @@
 'use client';
 import { useState, type FormEvent, type ReactNode } from 'react';
-import { Plus, Download, FileUp, Check, ClipboardCheck, ArrowRight } from 'lucide-react';
+import { Plus, Check, ClipboardCheck, ArrowRight } from 'lucide-react';
 import { Dialog, Field, Status, IdentityCard, formatMoney, formatTime, formatDate } from '@/components/ui/common';
 import { ROLE_NAMES, ROLES, labProblems, type Role } from '@shared/domain';
 import type { ModalState, WorkspaceData } from './workspace';
@@ -8,6 +8,7 @@ import { clinicRequest } from '@/app/lib/client';
 import { ClinicalFields, ClinicalReadout, MeasurementEditor, ReportReadout, PrintLink, emptyClinical } from './clinical-fields';
 import { ChargeOrigin, InvoiceChargeDialog } from './billing-charges';
 import { needsDoctorReview, suggestedLayout, templateRows } from '@shared/clinical';
+import { TestPicker } from '@/components/ui/test-picker';
 
 function localTime(iso: string) { if (!iso) return ''; const d = new Date(iso); return Number.isNaN(d.getTime()) ? '' : new Intl.DateTimeFormat('sv-SE', { timeZone: 'Asia/Taipei', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hour12: false }).format(d).replace(' ', 'T'); }
 function isoTime(local: string) { return local ? new Date(`${local}:00+08:00`).toISOString() : ''; }
@@ -33,12 +34,11 @@ function RecordWorkflowDialog({ modal, data, onClose, onSaved }: WorkflowProps) 
   const initialLayout = row.status === 'requested' && !row.value && !row.measurements?.length ? suggestedLayout(row.testName || '') : row.layout || 'general';
   const [layout, setLayout] = useState(initialLayout);
   const [measurements, setMeasurements] = useState<any[]>(row.measurements?.length ? row.measurements : initialLayout !== 'general' ? templateRows(initialLayout) : []);
-  const [raw, setRaw] = useState('');
   const [error, setError] = useState(''); const [busy, setBusy] = useState(false); const [editing, setEditing] = useState(false); const [checkResult, setCheckResult] = useState<string[] | null>(null);
   const draft = JSON.stringify([form, clinical, structured, layout, measurements]);
   const [initialDraft] = useState(draft);
   const [nextTask, setNextTask] = useState<NonNullable<ModalState> | null>(null);
-  const hasUnsavedChanges = draft !== initialDraft || raw !== '';
+  const hasUnsavedChanges = draft !== initialDraft;
   function switchTask(task: NonNullable<ModalState>) {
     if (busy) return;
     if (hasUnsavedChanges) setNextTask(task);
@@ -60,7 +60,7 @@ function RecordWorkflowDialog({ modal, data, onClose, onSaved }: WorkflowProps) 
       else if (kind === 'cancel-checkin') { path = `check-ins/${row.id}`; body = { reason: form.reason, version: row.version }; message = 'Check-in cancelled. The patient record remains available.'; }
       else if (kind === 'visit-new') { path = 'visits'; body = form; message = 'Consultation opened with its own visit number.'; }
       else if (kind === 'visit') { path = `visits/${row.id}`; body = { notes: form.notes, ...(structured ? { clinical } : {}), visitReason: form.visitReason, reason: form.reason, version: row.version, action: action === 'request-test' ? 'save' : action }; message = action === 'sign' ? 'Consultation completed. Billing can now prepare the bill.' : action === 'correct' ? 'Signed consultation corrected. The previous version was retained.' : 'Consultation draft saved.'; }
-      else if (kind === 'lab-new') { path = 'labs'; body = form; message = 'Laboratory request sent to laboratory staff.'; }
+      else if (kind === 'lab-new') { path = 'labs'; body = { patientId: form.patientId, visitId: form.visitId, testName: form.testName }; message = 'Laboratory request sent to laboratory staff.'; }
       else if (kind === 'lab' && action === 'patient-release') {
         path = `labs/${row.id}/patient-release`;
         body = { version: row.version, confirmed: form.releaseConfirmed };
@@ -71,12 +71,15 @@ function RecordWorkflowDialog({ modal, data, onClose, onSaved }: WorkflowProps) 
       else if (kind === 'review') { path = `reviews/${row.id}`; body = form; message = form.decision === 'link' ? 'Identity confirmed and source record linked. The decision is recorded.' : 'Source record kept separate. Your evidence is recorded.'; }
       else if (kind === 'staff-reset') { path = `staff/${row.id}/reset-password`; body = { password: form.password, reason: form.reason }; message = 'Temporary password set. Existing sessions ended; the staff member must replace it at sign-in.'; }
       else if (kind === 'staff-new' || kind === 'staff-edit') { path = kind === 'staff-new' ? 'staff' : `staff/${row.id}`; body = form; message = kind === 'staff-new' ? 'Staff account created with an assigned role.' : 'Staff access updated. Existing sessions for that account have ended.'; }
-      else if (kind === 'import') { const parsed = JSON.parse(raw); path = 'imports'; body = { source: role, records: Array.isArray(parsed) ? parsed : parsed.records }; }
       const result = await clinicRequest(path, body);
       if (kind === 'checkin' && result.alreadyWaiting) message = `This patient already has an open visit: ${result.id}.`;
-      if (kind === 'import') message = `${result.imported} received, ${result.held} held for checking, ${result.skipped} existing copies skipped.`;
-      await onSaved(message, kind === 'patient-new' ? { kind: 'checkin', patient: { ...form, id: result.id } } : kind === 'invoice-add' ? { kind: 'invoice', row } : kind === 'visit' && action === 'request-test' ? { kind: 'lab-new', patient: initialPatient, visit: row } : undefined);
-    } catch (e) { setError(e instanceof SyntaxError ? 'This file is not valid JSON. Use the sample format or check the file.' : e instanceof Error ? e.message : 'The record could not be saved.'); setBusy(false); }
+      let next: NonNullable<ModalState> | undefined;
+      if (kind === 'patient-new') next = { kind: 'checkin', patient: { ...form, id: result.id } };
+      if (kind === 'invoice-add') next = { kind: 'invoice', row };
+      if (kind === 'visit' && action === 'request-test') next = { kind: 'lab-new', patient: initialPatient, visit: row };
+      if (kind === 'lab' && ['doctor-review', 'patient-release'].includes(action)) next = { kind: 'lab', row };
+      await onSaved(message, next);
+    } catch (e) { setError(e instanceof Error ? e.message : 'The record could not be saved.'); setBusy(false); }
   }
   let title = '', fields: ReactNode;
   if (kind === 'checkin') {
@@ -101,6 +104,11 @@ function RecordWorkflowDialog({ modal, data, onClose, onSaved }: WorkflowProps) 
     const p = data.patients.find(p => p.id === row.patientId);
     const isResponsibleDoctor = row.doctorId === data.user.id;
     const readonly = row.status === 'signed' && !editing || !isResponsibleDoctor;
+    const tests = data.labs.filter(report => report.visitId === row.id && report.patientId === row.patientId);
+    const draftActions = <>
+      <button type="submit" name="action" value="save" formNoValidate className="button button-secondary" disabled={busy}>Save draft</button>
+      <button type="submit" name="action" value="request-test" formNoValidate className="button button-secondary" disabled={busy}>{tests.length ? 'Request another test' : 'Request test'}</button>
+    </>;
     fields = <>
       {p && <IdentityCard patient={p} />}
       <div className="record-summary"><span>{row.id} · {formatDate(row.date)}</span><Status value={row.status} /></div>
@@ -116,7 +124,24 @@ function RecordWorkflowDialog({ modal, data, onClose, onSaved }: WorkflowProps) 
           <button className="text-button" type="button" onClick={() => setEditing(true)}>Record a correction</button>
         </div>}
       </> : <>
-        {!editing && structured && <p className="form-intro">Fill in the three fields below to finish the visit. You can save a draft or request a test first.</p>}
+        {!editing && <>
+          <p className="form-intro">When you finish seeing the patient, complete the consultation to send the visit to Billing.</p>
+          {!!tests.length && <section className="visit-tests" aria-label="Tests for this visit">
+            <h3>Tests for this visit</h3>
+            <ul>{tests.map(report => {
+              const needsReview = needsDoctorReview(report);
+              const progress = report.status !== 'approved' ? 'Waiting for the lab'
+                : needsReview ? 'Lab approved · Doctor review needed'
+                : report.doctorReview?.releasedAt ? 'Shared in patient portal' : 'Reviewed · Ready to share';
+              return <li key={report.id}>
+                <div><strong>{report.testName}</strong><span>{progress}</span></div>
+                {report.status === 'approved' && <button type="button" className="button button-secondary" disabled={busy} onClick={() => switchTask({ kind: 'lab', row: report })}>
+                  {needsReview ? 'Review result' : 'View result'}
+                </button>}
+              </li>;
+            })}</ul>
+          </section>}
+        </>}
         <Field label="Reason for visit">
           <input required value={form.visitReason} onChange={e => set('visitReason', e.target.value)} maxLength={200} />
         </Field>
@@ -130,10 +155,11 @@ function RecordWorkflowDialog({ modal, data, onClose, onSaved }: WorkflowProps) 
           <textarea required minLength={12} maxLength={1000} value={form.reason} onChange={e => set('reason', e.target.value)} />
         </Field>}
         {error && <div className="form-error" role="alert"><strong>Unable to save</strong><p>{error}</p></div>}
-        {footer(editing ? 'Complete correction' : 'Complete consultation', editing ? 'correct' : 'sign', !editing ? <>
-          <button type="submit" name="action" value="save" formNoValidate className="button button-secondary" disabled={busy}>Save draft</button>
-          <button type="submit" name="action" value="request-test" formNoValidate className="button button-secondary" disabled={busy}>Request test</button>
-        </> : undefined)}
+        {!editing && !!tests.length && <details className="form-disclosure">
+          <summary>More consultation actions</summary>
+          <div className="patient-actions">{draftActions}</div>
+        </details>}
+        {footer(editing ? 'Complete correction' : 'Complete consultation', editing ? 'correct' : 'sign', !editing && !tests.length ? draftActions : undefined)}
       </>}
       {Array.isArray(row.history) && row.history.length > 0 && <details className="form-disclosure">
         <summary>Earlier signed versions ({row.history.length})</summary>
@@ -146,14 +172,46 @@ function RecordWorkflowDialog({ modal, data, onClose, onSaved }: WorkflowProps) 
       </details>}
     </>;
   } else if (kind === 'lab-new') {
-    title = 'Request laboratory test'; fields = <>{patientSelect(true)}<Field label="Test name"><input list="clinic-test-names" value={form.testName} onChange={e => set('testName', e.target.value)} maxLength={120} required /><datalist id="clinic-test-names"><option>Complete blood count</option><option>Blood glucose</option><option>Urinalysis</option><option>Cholesterol</option></datalist></Field><p className="source-line">The request is linked to this patient and visit. Laboratory staff complete and approve the report.</p>{footer('Send request')}</>;
+    title = 'Request laboratory test';
+    const testNames = data.labTestNames || [];
+    fields = <>{patientSelect(true)}{testNames.length ? <>
+      <TestPicker tests={testNames} value={form.testName} onChange={name => set('testName', name)} disabled={busy} />
+      <p className="source-line">Laboratory will receive this test request for the selected visit.</p>
+      <div className="form-actions"><button type="submit" className="button button-primary" disabled={busy || !testNames.includes(form.testName)}>{busy ? 'Sending…' : 'Send request'}</button></div>
+    </> : <p className="notice-inline">No laboratory tests are available. Ask the account manager to enable the tests the clinic offers under Service prices.</p>}</>;
   } else if (kind === 'lab') {
     title = 'Laboratory report'; const patient = data.patients.find(p => p.id === row.patientId); const canEdit = role === 'laboratory' && (row.status !== 'approved' || editing);
     const check = () => { try { return labProblems({ ...row, ...form, layout, measurements, collectedAt: isoTime(form.collectedAt) }, data.visits.find(v => v.id === row.visitId)); } catch { return ['Enter a valid collection date and time.']; } };
     const urgentReady = form.urgency !== 'urgent' || !!(form.contactPerson.trim() && form.contactMethod.trim() && form.contactAt);
     const approvalBlocked = !form.reviewed || !urgentReady || check().length > 0 || editing && form.reason.trim().length < 12;
     const review = row.doctorReview || {};
-    fields = <>{patient && <IdentityCard patient={patient} />}<div className="record-summary"><span>{row.id} · {row.visitId}</span><Status value={row.status} /></div><h3 className="record-test-name">{row.testName}</h3>{canEdit ? <><MeasurementEditor layout={layout} rows={measurements} setLayout={setLayout} setRows={setMeasurements} />{!measurements.length && layout === 'general' && <><Field label="Result" hint="Enter the result here. Enter its measurement unit separately below."><textarea value={form.value} onChange={e => set('value', e.target.value)} maxLength={3000} rows={3} /></Field><Field label="Result unit"><input value={form.unit === 'Not applicable' ? '' : form.unit} disabled={form.unit === 'Not applicable'} onChange={e => set('unit', e.target.value)} maxLength={80} /></Field><label className="check-field"><input type="checkbox" checked={form.unit === 'Not applicable'} onChange={e => set('unit', e.target.checked ? 'Not applicable' : '')} /><span>No unit applies to this result</span></label></>}<div className="form-grid"><Field label="Sample type" hint="For example: blood or urine."><input value={form.specimen} maxLength={120} onChange={e => set('specimen', e.target.value)} /></Field><Field label="Sample collected on / at" hint="Clinic time, UTC+8."><input type="datetime-local" value={form.collectedAt} onChange={e => set('collectedAt', e.target.value)} /></Field></div><details className="form-disclosure"><summary>Report comment (optional)</summary><Field label="Laboratory comment"><textarea rows={3} maxLength={2000} value={form.reportComment} onChange={e => set('reportComment', e.target.value)} /></Field></details><Field label="Clinician review priority" hint="Use your laboratory's approved procedure to decide whether immediate contact is needed."><select value={form.urgency} onChange={e => set('urgency', e.target.value)}><option value="routine">Routine review</option><option value="urgent">Urgent: clinician contacted</option></select></Field>{form.urgency === 'urgent' && <div className="urgent-handoff"><p>Contact the responsible clinician directly. Record the completed contact before approving.</p><Field label="Staff member contacted"><input maxLength={120} value={form.contactPerson} onChange={e => set('contactPerson', e.target.value)} /></Field><Field label="Contact method"><input maxLength={80} placeholder="Phone / in person" value={form.contactMethod} onChange={e => set('contactMethod', e.target.value)} /></Field><Field label="Contact date and time"><input type="datetime-local" value={form.contactAt} onChange={e => set('contactAt', e.target.value)} /></Field></div>}<button type="button" className="button button-secondary" onClick={() => setCheckResult(check())}><ClipboardCheck size={16} />Check report details</button>{checkResult && <div className={`check-result ${checkResult.length ? 'check-result-warning' : 'check-result-good'}`} role="status">{checkResult.length ? <ul>{checkResult.map(problem => <li key={problem}>{problem}</li>)}</ul> : <p><Check size={16} />Required details are complete. Review the content before approval.</p>}</div>}<label className="check-field"><input type="checkbox" checked={form.reviewed} onChange={e => set('reviewed', e.target.checked)} /><span>I checked the patient, request and report content.</span></label>{editing && <Field label="Reason for correction"><textarea required minLength={12} maxLength={1000} rows={3} value={form.reason} onChange={e => set('reason', e.target.value)} /></Field>}<p className="source-line" id="lab-approval-help">Complete the required details and confirm the report check before approving.</p>{footer(editing ? 'Approve correction' : 'Approve report', editing ? 'correct' : 'approve', !editing ? <button type="submit" name="action" value="save" className="button button-secondary" disabled={busy}>Save draft</button> : undefined, approvalBlocked)}</> : row.status === 'approved' ? <><ReportReadout report={row} /><div className="patient-actions"><PrintLink kind="lab" id={row.id} />{role === 'laboratory' && <button className="button button-secondary" type="button" onClick={() => setEditing(true)}>Record a correction</button>}</div>{role === 'doctor' && needsDoctorReview(row) ? <section className="doctor-review"><h3>Doctor review and follow-up</h3><p className="form-intro">Record your decision for this approved version. Opening a report or reading its alert does not complete this step.</p><Field label="Follow-up decision and plan"><textarea rows={3} required maxLength={3000} value={form.reviewPlan} onChange={e => set('reviewPlan', e.target.value)} /></Field><Field label="Follow-up date (optional)"><input type="date" value={form.followUpDate} onChange={e => set('followUpDate', e.target.value)} /></Field><label className="check-field"><input type="checkbox" checked={form.reviewConfirmed} onChange={e => set('reviewConfirmed', e.target.checked)} /><span>I reviewed this approved report and recorded the follow-up decision.</span></label>{footer('Save doctor review', 'doctor-review', undefined, !form.reviewConfirmed || !form.reviewPlan.trim())}</section> : review.reviewedAt && <section className="doctor-review"><h3>Doctor review recorded</h3><p className="clinical-notes">{role === 'doctor' ? review.plan : 'The responsible doctor recorded the review and follow-up decision.'}</p><p className="source-line">{review.reviewedBy} · {formatTime(review.reviewedAt)}{role === 'doctor' && review.followUpDate ? ` · Follow-up ${formatDate(review.followUpDate)}` : ''}</p></section>}</> : <p className="notice-inline">Laboratory staff are completing this report. Result content becomes available after approval.</p>}<p className="source-line">Source: {row.sourceRef}. Report version {row.version || '—'}.</p>{Array.isArray(row.history) && row.history.length > 0 && <details className="form-disclosure"><summary>Earlier approved versions ({row.history.length})</summary>{row.history.map((h: any, i: number) => <div className="previous-version" key={i}><ReportReadout report={h} /><p>Correction: {h.reason}</p><small>{h.changedBy} · {formatTime(h.changedAt)}</small></div>)}</details>}</>;
+    const approvedReport = <>
+      <ReportReadout report={row} />
+      <div className="patient-actions">
+        <PrintLink kind="lab" id={row.id} />
+        {role === 'laboratory' && <button className="button button-secondary" type="button" onClick={() => setEditing(true)}>Record a correction</button>}
+      </div>
+      {role === 'doctor' && needsDoctorReview(row) ? <section className="doctor-review">
+        <h3>Review the lab result</h3>
+        <p className="form-intro">Record what you discussed with the patient or what you plan to do next.</p>
+        <Field label="Doctor’s review notes">
+          <textarea rows={3} required maxLength={3000} value={form.reviewPlan} onChange={event => set('reviewPlan', event.target.value)} />
+        </Field>
+        <Field label="Return appointment date (if scheduled)">
+          <input type="date" value={form.followUpDate} onChange={event => set('followUpDate', event.target.value)} />
+        </Field>
+        <label className="check-field">
+          <input type="checkbox" checked={form.reviewConfirmed} onChange={event => set('reviewConfirmed', event.target.checked)} />
+          <span>I have reviewed this result.</span>
+        </label>
+        {footer('Save doctor review', 'doctor-review', undefined, !form.reviewConfirmed || !form.reviewPlan.trim())}
+      </section> : review.reviewedAt && <section className="doctor-review">
+        <h3>Doctor review saved</h3>
+        <p className="clinical-notes">{role === 'doctor' ? review.plan : 'The responsible doctor reviewed this result.'}</p>
+        <p className="source-line">{review.reviewedBy} · {formatTime(review.reviewedAt)}{role === 'doctor' && review.followUpDate ? ` · Return appointment ${formatDate(review.followUpDate)}` : ''}</p>
+      </section>}
+    </>;
+    fields = <>{patient && <IdentityCard patient={patient} />}<div className="record-summary"><span>{row.id} · {row.visitId}</span><Status value={row.status}>{role === 'doctor' && row.status === 'approved' ? 'Lab approved' : undefined}</Status></div><h3 className="record-test-name">{row.testName}</h3>{canEdit ? <><MeasurementEditor layout={layout} rows={measurements} setLayout={setLayout} setRows={setMeasurements} />{!measurements.length && layout === 'general' && <><Field label="Result" hint="Enter the result here. Enter its measurement unit separately below."><textarea value={form.value} onChange={e => set('value', e.target.value)} maxLength={3000} rows={3} /></Field><Field label="Result unit"><input value={form.unit === 'Not applicable' ? '' : form.unit} disabled={form.unit === 'Not applicable'} onChange={e => set('unit', e.target.value)} maxLength={80} /></Field><label className="check-field"><input type="checkbox" checked={form.unit === 'Not applicable'} onChange={e => set('unit', e.target.checked ? 'Not applicable' : '')} /><span>No unit applies to this result</span></label></>}<div className="form-grid"><Field label="Sample type" hint="For example: blood or urine."><input value={form.specimen} maxLength={120} onChange={e => set('specimen', e.target.value)} /></Field><Field label="Sample collected on / at" hint="Clinic time, UTC+8."><input type="datetime-local" value={form.collectedAt} onChange={e => set('collectedAt', e.target.value)} /></Field></div><details className="form-disclosure"><summary>Report comment (optional)</summary><Field label="Laboratory comment"><textarea rows={3} maxLength={2000} value={form.reportComment} onChange={e => set('reportComment', e.target.value)} /></Field></details><Field label="Clinician review priority" hint="Use your laboratory's approved procedure to decide whether immediate contact is needed."><select value={form.urgency} onChange={e => set('urgency', e.target.value)}><option value="routine">Routine review</option><option value="urgent">Urgent: clinician contacted</option></select></Field>{form.urgency === 'urgent' && <div className="urgent-handoff"><p>Contact the responsible clinician directly. Record the completed contact before approving.</p><Field label="Staff member contacted"><input maxLength={120} value={form.contactPerson} onChange={e => set('contactPerson', e.target.value)} /></Field><Field label="Contact method"><input maxLength={80} placeholder="Phone / in person" value={form.contactMethod} onChange={e => set('contactMethod', e.target.value)} /></Field><Field label="Contact date and time"><input type="datetime-local" value={form.contactAt} onChange={e => set('contactAt', e.target.value)} /></Field></div>}<button type="button" className="button button-secondary" onClick={() => setCheckResult(check())}><ClipboardCheck size={16} />Check report details</button>{checkResult && <div className={`check-result ${checkResult.length ? 'check-result-warning' : 'check-result-good'}`} role="status">{checkResult.length ? <ul>{checkResult.map(problem => <li key={problem}>{problem}</li>)}</ul> : <p><Check size={16} />Required details are complete. Review the content before approval.</p>}</div>}<label className="check-field"><input type="checkbox" checked={form.reviewed} onChange={e => set('reviewed', e.target.checked)} /><span>I checked the patient, request and report content.</span></label>{editing && <Field label="Reason for correction"><textarea required minLength={12} maxLength={1000} rows={3} value={form.reason} onChange={e => set('reason', e.target.value)} /></Field>}<p className="source-line" id="lab-approval-help">Complete the required details and confirm the report check before approving.</p>{footer(editing ? 'Approve correction' : 'Approve report', editing ? 'correct' : 'approve', !editing ? <button type="submit" name="action" value="save" className="button button-secondary" disabled={busy}>Save draft</button> : undefined, approvalBlocked)}</> : row.status === 'approved' ? approvedReport : <p className="notice-inline">Laboratory staff are completing this report. Result content becomes available after approval.</p>}<p className="source-line">Source: {row.sourceRef}. Report version {row.version || '—'}.</p>{Array.isArray(row.history) && row.history.length > 0 && <details className="form-disclosure"><summary>Earlier approved versions ({row.history.length})</summary>{row.history.map((h: any, i: number) => <div className="previous-version" key={i}><ReportReadout report={h} /><p>Correction: {h.reason}</p><small>{h.changedBy} · {formatTime(h.changedAt)}</small></div>)}</details>}</>;
   } else if (kind === 'invoice') {
     title = 'Bill and payments';
     const patient = data.patients.find(p => p.id === row.patientId);
@@ -206,25 +264,27 @@ function RecordWorkflowDialog({ modal, data, onClose, onSaved }: WorkflowProps) 
   } else if (kind === 'staff-new' || kind === 'staff-edit') {
     title = kind === 'staff-new' ? 'Add staff account' : 'Manage staff access';
     fields = <>{kind === 'staff-new' ? <><Field label="Staff name"><input value={form.name} onChange={e => set('name', e.target.value)} required maxLength={120} autoComplete="off" /></Field><Field label="Username"><input value={form.username} onChange={e => set('username', e.target.value)} required pattern="[a-zA-Z0-9._-]{3,40}" minLength={3} maxLength={40} autoComplete="off" /></Field><Field label="Password" hint="At least 12 characters. Give this to the staff member privately."><input type="password" autoComplete="new-password" value={form.password} onChange={e => set('password', e.target.value)} required minLength={12} maxLength={200} /></Field></> : <div className="form-intro"><strong>{row.name}</strong><br />{row.username}<br /><button type="button" className="text-button" onClick={() => switchTask({ kind: 'staff-reset', row })}>Reset password after verifying identity</button></div>}<Field label="Assigned role"><select value={form.role} onChange={e => set('role', e.target.value)}>{ROLES.map(r => <option key={r} value={r}>{ROLE_NAMES[r]}</option>)}</select></Field>{kind === 'staff-edit' && <><label className="check-field"><input type="checkbox" checked={form.active} onChange={e => set('active', e.target.checked)} /><span>Allow this account to sign in</span></label><Field label="Reason for changing access"><textarea required minLength={12} maxLength={1000} rows={3} value={form.reason} onChange={e => set('reason', e.target.value)} /></Field><p className="source-line">Existing sessions for this account will end after the change.</p></>}{footer(kind === 'staff-new' ? 'Create account' : 'Save access')}</>;
-  } else if (kind === 'import') {
-    title = `Receive ${role === 'laboratory' ? 'laboratory' : 'billing'} records`;
-    const samplePatient = data.patients[0]; const sampleVisit = data.visits.find(v => v.patientId === samplePatient?.id);
-    const sample = samplePatient && sampleVisit ? { records: [{ externalId: role === 'laboratory' ? 'LAB-ORIGINAL-NUMBER' : 'BILL-ORIGINAL-NUMBER', patientId: samplePatient.id, patientName: samplePatient.name, patientDob: samplePatient.dob, visitId: sampleVisit.id, ...(role === 'laboratory' ? { testName: 'Blood glucose', value: '', unit: '', collectedAt: `${sampleVisit.date}T02:00:00.000Z` } : { date: sampleVisit.date, items: [{ description: 'Service name', amount: '' }] }) }] } : { records: [] };
-    function downloadSample() { const blob = new Blob([JSON.stringify(sample, null, 2)], { type: 'application/json' }); const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = `${role}-import-template.json`; a.click(); setTimeout(() => URL.revokeObjectURL(url), 1000); }
-    let previewRows: any[] = []; let count: number | null = null; try { const parsed = JSON.parse(raw); const rows = Array.isArray(parsed) ? parsed : parsed.records; if (Array.isArray(rows)) { count = rows.length; previewRows = rows; } } catch { /* Keep editing an unfinished file. */ }
-    fields = <><p className="form-intro">Upload a department file with up to 50 records. Review the patient and original record numbers before receiving it. Existing source references are skipped; uncertain identities wait for checking. If a record cannot be received, no changes from this file are saved. Correct the problem and retry the file.</p><div className="import-actions"><button type="button" className="button button-secondary" onClick={downloadSample}><Download size={15} />Download import template</button></div><label className="file-input"><FileUp size={18} /><span>Choose department file</span><input type="file" accept=".json,application/json" onChange={async e => { const file = e.target.files?.[0]; if (!file) return; if (file.size > 100_000) { setError('Choose a file smaller than 100 KB.'); return; } setRaw(await file.text()); setError(''); }} /></label><details className="form-disclosure"><summary>View file contents</summary><Field label="Department file contents"><textarea className="source-editor" rows={8} value={raw} onChange={e => setRaw(e.target.value)} spellCheck={false} /></Field></details>{previewRows.length > 0 && <div className="import-preview"><h3>Records in this file</h3><div className="table-wrap"><table><thead><tr><th>Patient</th><th>Original number</th><th>Visit</th></tr></thead><tbody>{previewRows.slice(0, 5).map((record, index) => <tr key={index}><td data-label="Patient">{String(record.patientName || 'Not provided')}</td><td data-label="Original number">{String(record.externalId || 'Not provided')}</td><td data-label="Visit">{String(record.visitId || 'Not provided')}</td></tr>)}</tbody></table></div>{previewRows.length > 5 && <p>{previewRows.length - 5} more records in this file.</p>}</div>}{count !== null && <p className="notice-inline">{count} source {count === 1 ? 'record' : 'records'} ready for identity and detail checks.</p>}{footer('Receive records', 'save', undefined, !count)}</>;
   } else { title = 'Record unavailable'; fields = <p>This record is no longer available. Close this view and refresh the workspace.</p>; }
   const canRelease = kind === 'lab' && role === 'doctor' && row.status === 'approved' && row.doctorReview?.reviewedAt && !needsDoctorReview(row);
+  const reportVisit = canRelease ? data.visits.find(visit =>
+    visit.id === row.visitId && visit.patientId === row.patientId && visit.doctorId === data.user.id
+    && ['draft', 'signed'].includes(visit.status)
+  ) : undefined;
   return <Dialog title={title} onClose={onClose} busy={busy} hasUnsavedChanges={hasUnsavedChanges} pendingChange={nextTask ? {
     proceed: () => { setNextTask(null); void onSaved('', nextTask); },
     cancel: () => setNextTask(null),
   } : undefined}><form onSubmit={submit}>{fields}
     {canRelease && <section className="doctor-review"><h3>Patient portal</h3>
-      {row.doctorReview.releasedAt ? <p className="notice-inline">Released to the patient on {formatTime(row.doctorReview.releasedAt)}.</p> : <>
-        <p className="form-intro">Release this reviewed result so the patient can see the measurements in their own portal.</p>
-        <label className="check-field"><input type="checkbox" checked={!!form.releaseConfirmed} onChange={event => set('releaseConfirmed', event.target.checked)} /><span>I confirm this result is ready to share with this patient.</span></label>
-        <div className="form-actions"><button type="submit" name="action" value="patient-release" className="button button-primary" disabled={busy || !form.releaseConfirmed}>{busy ? 'Saving…' : 'Release to patient'}</button></div>
+      {row.doctorReview.releasedAt ? <p className="notice-inline">Shared in the patient portal on {formatTime(row.doctorReview.releasedAt)}.</p> : <>
+        <p className="form-intro">Share this result to make it visible in the patient’s portal.</p>
+        <label className="check-field"><input type="checkbox" checked={!!form.releaseConfirmed} onChange={event => set('releaseConfirmed', event.target.checked)} /><span>I confirm this result is ready to share with the patient.</span></label>
       </>}
+      <div className="form-actions">
+        {reportVisit && <button type="button" className="button button-secondary" disabled={busy} onClick={() => switchTask({ kind: 'visit', row: reportVisit })}>
+          {reportVisit.status === 'signed' ? 'View completed consultation' : 'Return to consultation'}
+        </button>}
+        {!row.doctorReview.releasedAt && <button type="submit" name="action" value="patient-release" className="button button-primary" disabled={busy || !form.releaseConfirmed}>{busy ? 'Saving…' : 'Share with patient'}</button>}
+      </div>
     </section>}
     {kind !== 'invoice' && kind !== 'visit' && error && <div className="form-error" role="alert"><strong>Unable to save</strong><p>{error}</p></div>}</form></Dialog>;
 }

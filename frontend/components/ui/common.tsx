@@ -33,9 +33,9 @@ export function Field({ label, children, hint, error }: { label: string; childre
 }
 type DialogProps = {
   title: string; children: ReactNode; onClose: () => void; hasUnsavedChanges?: boolean; busy?: boolean;
-  pendingChange?: { proceed: () => void; cancel: () => void };
+  pendingChange?: { proceed: () => void; cancel: () => void }; className?: string;
 };
-export function Dialog({ title, children, onClose, hasUnsavedChanges = false, busy = false, pendingChange }: DialogProps) {
+export function Dialog({ title, children, onClose, hasUnsavedChanges = false, busy = false, pendingChange, className = '' }: DialogProps) {
   const ref = useRef<HTMLDialogElement>(null);
   const discardRef = useRef<HTMLDialogElement>(null);
   const keepRef = useRef<HTMLButtonElement>(null);
@@ -70,7 +70,7 @@ export function Dialog({ title, children, onClose, hasUnsavedChanges = false, bu
     else onClose();
   }
   return <>
-    <dialog ref={ref} className="dialog" aria-labelledby={titleId} onCancel={e => { e.preventDefault(); requestClose(); }} onClick={e => { if (e.target === e.currentTarget) requestClose(); }}>
+    <dialog ref={ref} className={`dialog ${className}`.trim()} aria-labelledby={titleId} onCancel={e => { e.preventDefault(); requestClose(); }} onClick={e => { if (e.target === e.currentTarget) requestClose(); }}>
       <div className="dialog-header"><h2 id={titleId}>{title}</h2><button type="button" className="icon-button" disabled={busy} onClick={requestClose} aria-label="Close dialog"><X size={20} /></button></div>
       <div className="dialog-content">{children}</div>
     </dialog>
@@ -87,8 +87,9 @@ export function Dialog({ title, children, onClose, hasUnsavedChanges = false, bu
   </>;
 }
 export function TextLink({ href, children }: { href: string; children: ReactNode }) { return <Link className="text-link" href={href}>{children}<ArrowRight size={15} aria-hidden="true" /></Link>; }
-export function IdentityCard({ patient, doctor }: { patient: any; doctor?: string }) {
-  return <div className="identity-card"><div className="patient-initial" aria-hidden="true">{patient.name.split(' ').map((s: string) => s[0]).slice(0, 2).join('')}</div><div className="identity-main"><strong>{patient.name}</strong><span>{patient.id}</span></div><dl><div><dt>Birth date</dt><dd>{formatDate(patient.dob)}</dd></div>{doctor && <div><dt>Assigned doctor</dt><dd>{doctor}</dd></div>}</dl></div>;
+export function IdentityCard({ patient, doctor, pageHeading = false }: { patient: any; doctor?: string; pageHeading?: boolean }) {
+  const Name = pageHeading ? 'h1' : 'strong';
+  return <div className="identity-card"><div className="patient-initial" aria-hidden="true">{patient.name.split(' ').map((s: string) => s[0]).slice(0, 2).join('')}</div><div className="identity-main"><Name>{patient.name}</Name><span>{patient.id}</span></div><dl><div><dt>Birth date</dt><dd>{formatDate(patient.dob)}</dd></div>{doctor && <div><dt>Assigned doctor</dt><dd>{doctor}</dd></div>}</dl></div>;
 }
 export const formatMoney = (cents: number) => new Intl.NumberFormat('en-PH', { style: 'currency', currency: 'PHP' }).format(cents / 100);
 export function formatDate(value: string) { if (!value) return '—'; const d = new Date(value.length === 10 ? `${value}T12:00:00+08:00` : value); return Number.isNaN(d.getTime()) ? '—' : new Intl.DateTimeFormat('en-GB', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'Asia/Taipei' }).format(d); }

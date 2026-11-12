@@ -9,9 +9,11 @@ export type SavedNotification = {
   id: string; actor: string; body: string; subject: string; kind: NotificationItem['kind'];
   createdAt: string; readAt: string | null; archivedAt: string | null; href: string;
 };
-export function StaffNotifications({ notifications, reload }: { notifications: SavedNotification[]; reload: () => Promise<void> }) {
+export function StaffNotifications({ notifications, reload, onOpenTask }: { notifications: SavedNotification[]; reload: () => Promise<void>; onOpenTask: (href: string) => Promise<void> }) {
   const [open, setOpen] = useState(false); const [error, setError] = useState('');
   const [pending, setPending] = useState<Record<string, Partial<SavedNotification>>>({});
+  const [opening, setOpening] = useState(false);
+  const openingRef = useRef(false);
   const root = useRef<HTMLDivElement>(null); const trigger = useRef<HTMLButtonElement>(null);
   const list = notifications.map(n => ({ ...n, ...pending[n.id] }));
   const unread = list.filter(n => !n.readAt && !n.archivedAt).length;
@@ -46,14 +48,21 @@ export function StaffNotifications({ notifications, reload }: { notifications: S
     </button>
     {open && <div className="notification-popover" id="staff-notification-panel" role="region" aria-label="Staff notifications">
       {error && <p className="notification-error" role="alert">{error}</p>}
+      {opening && <p className="notification-progress" role="status">Opening the latest record…</p>}
       <NotificationPanel items={items} onClose={close} maxHeight={420} onMarkAllRead={allRead}
         onReadChange={(item, unread) => { void update(item.id, { unread }); }}
         onArchiveChange={(item, archived) => { void update(item.id, { archived }); }}
         onOpenItem={async item => {
           const saved = notifications.find(n => n.id === item.id);
-          if (!saved?.href.startsWith('/clinic/')) return;
-          try { await clinicRequest(`notifications/${item.id}`, { unread: false }); window.location.assign(saved.href); }
+          if (!saved?.href.startsWith('/clinic/') || openingRef.current) return;
+          openingRef.current = true; setOpening(true); setError('');
+          try {
+            await clinicRequest(`notifications/${item.id}`, { unread: false });
+            await onOpenTask(saved.href);
+            setOpen(false);
+          }
           catch { setError('This task could not be opened. Refresh the work list and try again.'); }
+          finally { openingRef.current = false; setOpening(false); }
         }} />
     </div>}
   </div>;

@@ -1,7 +1,7 @@
 'use client';
 import { useState, type ReactNode } from 'react';
 import Link from 'next/link';
-import { Plus, ArrowRight, FileUp, Search, CircleCheck, Clock3, ShieldCheck } from 'lucide-react';
+import { Plus, ArrowRight, Search, CircleCheck, Clock3, ShieldCheck } from 'lucide-react';
 import { Empty, Panel, SearchField, Status, formatDate, formatTime, formatMoney, PageHeading } from '@/components/ui/common';
 import { needsDoctorReview } from '@shared/clinical';
 import { ROLE_NAMES, clinicDay, labProblems, type Role } from '@shared/domain';
@@ -71,15 +71,15 @@ export function Consultations({ data, open }: Props) {
 
   </>;
 }
-function VisitTable({ data, rows, open }: Props & { rows: any[] }) {
+function VisitTable({ data, rows, open, patientPage = false }: Props & { rows: any[]; patientPage?: boolean }) {
   return <WorkTable rows={rows} empty="No visits in this list" detail="Checked-in patients and unfinished consultations will appear in your waiting list." columns={[
-    { label: 'Patient / visit', render: v => person(data, v) }, { label: 'Visit date', render: v => formatDate(v.date) },
+    { label: patientPage ? 'Visit number' : 'Patient / visit', render: v => patientPage ? <strong>{v.id}</strong> : person(data, v) }, { label: 'Visit date', render: v => formatDate(v.date) },
     { label: 'Progress', render: v => <Status value={v.status} /> },
     { label: 'Action', action: true, render: v => action(v.status === 'signed' || v.doctorId !== data.user.id ? 'View consultation' : v.status === 'waiting' ? 'Start consultation' : 'Continue consultation', () => open({ kind: 'visit', row: v })) },
   ]} />;
 }
 
-export function Laboratory({ data, open }: Props) {
+export function Laboratory({ data, open, stale = false }: Props & { stale?: boolean }) {
   const doctor = data.user.role === 'doctor';
   const [tab, setTab] = useState(doctor ? 'review' : 'waiting'); const [query, setQuery] = useState('');
   const pending = data.labs.filter(l => l.status !== 'approved');
@@ -87,16 +87,25 @@ export function Laboratory({ data, open }: Props) {
   const rows = data.labs.filter(l => (tab === 'review' ? needsDoctorReview(l) : tab === 'waiting' ? l.status !== 'approved' : tab === 'approved' ? l.status === 'approved' && (!doctor || !needsDoctorReview(l)) : true) && matches(query, patientFor(data, l.patientId)?.name, l.testName, l.id))
     .sort((a, b) => (a.urgency === 'urgent' && needsDoctorReview(a) ? 0 : 1) - (b.urgency === 'urgent' && needsDoctorReview(b) ? 0 : 1) || (tab === 'waiting' || tab === 'review' ? a.updatedAt.localeCompare(b.updatedAt) : b.updatedAt.localeCompare(a.updatedAt)));
   const tabs = [...(doctor ? [{ id: 'review', label: 'Needs your review', count: needsReview.length }] : []), { id: 'waiting', label: doctor ? 'Waiting for laboratory' : 'To complete', count: pending.length }, { id: 'approved', label: doctor ? 'Reviewed reports' : 'Approved reports' }, { id: 'all', label: 'All requests' }];
-  return <><PageHeading title={doctor ? 'Tests & reports' : 'Laboratory work'} description={doctor ? `${needsReview.length} approved ${needsReview.length === 1 ? 'report needs' : 'reports need'} your review and follow-up decision.` : `${pending.length} ${pending.length === 1 ? 'request needs' : 'requests need'} completion or approval.`} action={doctor ? <button className="button button-primary" onClick={() => open({ kind: 'lab-new' })}><Plus size={17} />Request a test</button> : undefined} />
-    <WorkTabs value={tab} onChange={setTab} tabs={tabs} /><Toolbar search={query} setSearch={setQuery} label="Find a patient or test" count={rows.length} /><LabTable data={data} open={open} rows={rows} />
+  return <><PageHeading title={doctor ? 'Tests & reports' : 'Laboratory work'} description={stale ? 'Counts may be out of date while the work list reconnects.' : doctor ? `${needsReview.length} approved ${needsReview.length === 1 ? 'report needs' : 'reports need'} your review and follow-up decision.` : `${pending.length} ${pending.length === 1 ? 'request needs' : 'requests need'} completion or approval.`} action={doctor ? <button className="button button-primary" onClick={() => open({ kind: 'lab-new' })}><Plus size={17} />Request a test</button> : undefined} />
+    {stale && <p className="notice-inline" role="status">This work list could not refresh. The records shown may be out of date. It will update when the connection returns.</p>}
+    <WorkTabs value={tab} onChange={setTab} tabs={tabs} /><Toolbar search={query} setSearch={setQuery} label="Find a patient or test" count={rows.length} />{stale && !rows.length ? <Empty title="Waiting for the work list to reconnect" detail="We cannot confirm whether there are new requests yet." /> : <LabTable data={data} open={open} rows={rows} />}
     <div className="next-step-note"><ShieldCheck size={17} />{doctor ? 'Review the approved report and save your follow-up decision. Corrected reports need a new review.' : 'Check the actual panel, sample details and report content before approving. Urgent reports require direct clinician contact.'}</div>
   </>;
 }
 
-function LabTable({ data, rows, open }: Props & { rows: any[] }) {
+function LabTable({ data, rows, open, patientPage = false }: Props & { rows: any[]; patientPage?: boolean }) {
+  const doctor = data.user.role === 'doctor';
   return <WorkTable rows={rows} empty="No reports in this list" detail={data.user.role === 'laboratory' ? 'New test requests will appear here automatically.' : 'Requests and approved reports for your patients appear here.'} columns={[
-    { label: 'Patient / report', render: l => person(data, l) }, { label: 'Test', render: l => <><strong>{l.testName}</strong><small>Visit {l.visitId}</small></> },
-    { label: 'Progress', render: l => <><Status value={l.status} />{l.status === 'approved' && <small className={l.urgency === 'urgent' && needsDoctorReview(l) ? 'urgent-label' : ''}>{needsDoctorReview(l) ? l.urgency === 'urgent' ? 'Urgent: awaiting doctor review' : 'Awaiting doctor review' : 'Doctor review recorded'}</small>}</> },
+    { label: patientPage ? 'Report number' : 'Patient / report', render: l => patientPage ? <strong>{l.id}</strong> : person(data, l) }, { label: 'Test', render: l => <><strong>{l.testName}</strong><small>Visit {l.visitId}</small></> },
+    { label: 'Progress', render: l => <>
+      <Status value={l.status}>{doctor && l.status === 'approved' ? 'Lab approved' : undefined}</Status>
+      {l.status === 'approved' && <small className={l.urgency === 'urgent' && needsDoctorReview(l) ? 'urgent-label' : ''}>
+        {needsDoctorReview(l) ? l.urgency === 'urgent' ? 'Urgent: awaiting doctor review' : 'Awaiting doctor review'
+          : doctor ? l.doctorReview?.releasedAt ? 'Shared in patient portal' : 'Reviewed · Ready to share'
+          : 'Doctor review recorded'}
+      </small>}
+    </> },
     { label: 'Updated', render: l => formatDate(l.updatedAt) },
     { label: 'Action', action: true, render: l => action(data.user.role === 'doctor' && needsDoctorReview(l) ? 'Review report' : data.user.role !== 'laboratory' || l.status === 'approved' ? 'View report' : l.status === 'requested' ? 'Enter result' : 'Finish report', () => open({ kind: 'lab', row: l })) },
   ]} />;
@@ -139,8 +148,8 @@ export function PatientWork({ data, patient, open }: Props & { patient: any }) {
   const role = data.user.role;
   return <div className="patient-work">
     {role === 'registration' && <><div className="patient-actions"><button className="button button-primary" onClick={() => open({ kind: 'checkin', patient })}>Check in for a visit<ArrowRight size={16} /></button></div><Panel title="Visit progress"><WorkTable rows={visits} empty="No visits recorded" columns={[{ label: 'Visit', render: v => <><strong>{v.id}</strong><small>{formatDate(v.date)}</small></> }, { label: 'Progress', render: v => <Status value={v.status} /> }, { label: 'Action', action: true, render: v => v.status === 'waiting' ? action('Cancel check-in', () => open({ kind: 'cancel-checkin', row: v })) : <span className="muted">With the responsible department</span> }]} /></Panel></>}
-    {role === 'doctor' && <Panel title="Consultations" aside={!visits.some(v => v.status === 'waiting' || v.status === 'draft' && v.date === clinicDay()) ? <button className="button button-secondary" onClick={() => open({ kind: 'visit-new', patient })}><Plus size={16} />New consultation</button> : undefined}><VisitTable data={data} rows={visits} open={open} /></Panel>}
-    {['doctor', 'laboratory'].includes(role) && <Panel title="Laboratory reports" aside={role === 'doctor' && visits.some(v => !['waiting', 'cancelled'].includes(v.status)) ? <button className="button button-secondary" onClick={() => open({ kind: 'lab-new', patient })}>Request a test</button> : undefined}><LabTable data={data} rows={labs} open={open} /></Panel>}
+    {role === 'doctor' && <Panel title="Consultations" aside={!visits.some(v => v.status === 'waiting' || v.status === 'draft') ? <button className="button button-secondary" onClick={() => open({ kind: 'visit-new', patient })}><Plus size={16} />New consultation</button> : undefined}><VisitTable data={data} rows={visits} open={open} patientPage /></Panel>}
+    {['doctor', 'laboratory'].includes(role) && <Panel title="Laboratory reports" aside={role === 'doctor' && visits.some(v => !['waiting', 'cancelled'].includes(v.status)) ? <button className="button button-secondary" onClick={() => open({ kind: 'lab-new', patient })}>Request a test</button> : undefined}><LabTable data={data} rows={labs} open={open} patientPage /></Panel>}
     {role === 'billing' && <Panel title="Bills & payments"><BillTable data={data} rows={bills} open={open} /></Panel>}
     {role === 'reviewer' && <Panel title="Record questions"><ReviewRows data={data} open={open} rows={data.reviews.filter(r => r.patientId === patient.id)} /></Panel>}
   </div>;
@@ -149,31 +158,23 @@ export function PatientWork({ data, patient, open }: Props & { patient: any }) {
 export function ReviewWork({ data, open }: Props) {
   const [tab, setTab] = useState('open'); const [query, setQuery] = useState(''); const reviewer = data.user.role === 'reviewer';
   const rows = data.reviews.filter(r => (tab === 'open' ? r.state === 'open' : r.state !== 'open') && matches(query, r.title, r.detail, r.id, patientFor(data, r.patientId)?.name));
-  return <><PageHeading title={reviewer ? 'Record checks' : 'Identity checks'} description={reviewer ? 'Check uncertain records and keep each correction with its responsible department.' : 'Confirm patient identity before linking records from another department.'} />
-    {reviewer && data.quality && <div className="quality-strip"><div><span>Identity questions</span><strong>{data.quality.identityQuestions}</strong></div><div><span>Incomplete reports</span><strong>{data.quality.incompleteReports}</strong></div><div><span>Imports on hold</span><strong>{data.quality.heldImports}</strong></div></div>}
+  return <><PageHeading title={reviewer ? 'Record checks' : 'Identity checks'} description={reviewer ? 'Review patient identity questions and problems found in approved reports.' : 'Confirm patient identity before linking records from another department.'} />
+    {reviewer && data.quality && <div className="quality-strip">
+      <div><span>Identity questions</span><strong>{data.quality.identityQuestions}</strong></div>
+      <div><span>Approved reports needing a check</span><strong>{data.quality.invalidApproved}</strong></div>
+    </div>}
     <WorkTabs value={tab} onChange={setTab} tabs={[{ id: 'open', label: 'Needs attention', count: data.reviews.filter(r => r.state === 'open').length }, { id: 'resolved', label: 'Resolved checks' }]} />
     <Toolbar search={query} setSearch={setQuery} label="Find a patient or record problem" count={rows.length} /><ReviewRows data={data} open={open} rows={rows} />
-    {reviewer && <div className="next-step-note"><ShieldCheck size={17} />Quality checked {formatTime(data.quality?.checkedAt)}. Unfinished reports are work in progress; clinical content is checked by laboratory staff.</div>}
+    {reviewer && <div className="next-step-note"><ShieldCheck size={17} />Laboratory staff finish drafts in Laboratory work and correct approved reports there.</div>}
   </>;
 }
 function ReviewRows({ data, rows, open }: Props & { rows: any[] }) {
-  return <WorkTable rows={rows} empty="No record questions in this list" detail="Uncertain patient matches and missing report details appear here when detected." columns={[
+  return <WorkTable rows={rows} empty="No record questions in this list" columns={[
     { label: 'Record question', render: r => <><strong>{r.title}</strong><small>{r.recordId}</small></> },
     { label: 'Responsible department', render: r => ROLE_NAMES[r.ownerRole as Role] || r.ownerRole },
     { label: 'Progress', render: r => <Status value={r.state} /> },
     { label: 'Action', action: true, render: r => action(r.state === 'open' && r.kind === 'identity' ? 'Check identity' : 'View details', () => open({ kind: r.state === 'open' && r.kind === 'identity' ? 'review' : 'issue-info', row: r })) },
   ]} />;
-}
-
-export function Sources({ data, open }: Props) {
-  const [query, setQuery] = useState(''); const canImport = ['laboratory', 'billing'].includes(data.user.role);
-  const rows = data.imports.filter(i => matches(query, i.externalId, i.source, i.linkedPatientId));
-  return <><PageHeading title="Department imports" description="Receive department files, retain their original record numbers and check uncertain patient matches." action={canImport ? <button className="button button-primary" onClick={() => open({ kind: 'import' })}><FileUp size={17} />Import a file</button> : undefined} />
-    <Toolbar search={query} setSearch={setQuery} label="Find an original record number" count={rows.length} /><WorkTable rows={rows} empty="No department files received" detail={canImport ? 'Import a department file to review its records before receiving them.' : 'Received records and their patient-link decisions appear here.'} columns={[
-      { label: 'Original record number', render: r => <strong>{r.externalId}</strong> }, { label: 'Department', render: r => r.source === 'laboratory' ? 'Laboratory' : 'Billing' },
-      { label: 'Patient link', render: r => r.linkedPatientId || 'Waiting for confirmation' }, { label: 'Received', render: r => formatTime(r.receivedAt) }, { label: 'Progress', render: r => <Status value={r.state} /> },
-    ]} /><div className="next-step-note"><ShieldCheck size={17} />Repeated original record numbers are skipped. Uncertain patient matches stay separate until identity is confirmed.</div>
-  </>;
 }
 
 export function StaffAccounts({ data, open }: Props) {

@@ -1,16 +1,17 @@
 'use client';
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import Link from 'next/link';
-import { usePathname, useRouter } from 'next/navigation';
-import { UsersRound, Stethoscope, FlaskConical, ReceiptText, ListChecks, Database, ChartNoAxesCombined, ShieldCheck, History, LogOut, Menu, RefreshCw, ArrowLeft, ChevronRight } from 'lucide-react';
+import { usePathname, useRouter, useSearchParams } from 'next/navigation';
+import { UsersRound, Stethoscope, FlaskConical, ReceiptText, ListChecks, ChartNoAxesCombined, ShieldCheck, History, LogOut, Menu, RefreshCw, ArrowLeft, ChevronRight } from 'lucide-react';
 import { Brand, Dialog, Empty, IdentityCard, Panel, formatDate, formatTime } from '@/components/ui/common';
 import { StaffNotifications, type SavedNotification } from '@/components/ui/staff-notifications';
 import { WorkspaceLoading } from '@/components/ui/workspace-loading';
+import { SignOutDialog } from '@/components/ui/sign-out-dialog';
 import { ROLE_NAMES, ROLE_DETAILS, type Role } from '@shared/domain';
 import { clinicRequest } from '@/app/lib/client';
 import { useNotificationUpdates } from '@/app/lib/notification-updates';
 import { WorkflowDialog } from './workflow-dialog';
-import { Reception, Consultations, Laboratory, Billing, PatientRegister, ReviewWork, Sources, StaffAccounts, ActivityHistory, PatientWork } from './staff-views';
+import { Reception, Consultations, Laboratory, Billing, PatientRegister, ReviewWork, StaffAccounts, ActivityHistory, PatientWork } from './staff-views';
 import { AccountSettings, OperationsSettings } from './account-settings';
 import { AnalyticsWorkspace } from './analytics-workspace';
 import { ServicePrices } from './service-prices';
@@ -20,7 +21,7 @@ import type { ServicePriceList } from '@shared/billing';
 export type WorkspaceData = {
   user: any; patients: any[]; visits: any[]; labs: any[]; invoices: any[]; reviews: any[];
   imports: any[]; facts: any[]; runs: any[]; staff: any[]; history: any[]; generatedAt: string;
-  notifications: SavedNotification[]; billingServices: any[]; quality?: any; priceList?: ServicePriceList;
+  notifications: SavedNotification[]; billingServices: any[]; quality?: any; priceList?: ServicePriceList; labTestNames?: string[];
 };
 export type ModalState = { kind: string; row?: any; patient?: any; visit?: any } | null;
 export type OpenTask = (task: NonNullable<ModalState>) => void;
@@ -33,7 +34,6 @@ const NAV = [
   { slug: 'billing', label: 'Billing & payments', icon: ReceiptText, roles: ['billing'] },
   { slug: 'review', label: 'Identity checks', icon: ListChecks, roles: ['registration', 'reviewer'] },
   { slug: 'reports', label: 'Reports & analytics', icon: ChartNoAxesCombined, roles: ['reviewer'] },
-  { slug: 'sources', label: 'Department imports', icon: Database, roles: ['laboratory', 'billing', 'reviewer'] },
   { slug: 'staff', label: 'Staff accounts', icon: UsersRound, roles: ['manager'] },
   { slug: 'operations', label: 'Clinic operations', icon: ShieldCheck, roles: ['manager'] },
   { slug: 'prices', label: 'Service prices', icon: ReceiptText, roles: ['manager'] },
@@ -41,11 +41,13 @@ const NAV = [
 ];
 
 export function ClinicApp({ localNotificationPort }: { localNotificationPort?: string }) {
-  const pathname = usePathname(); const router = useRouter(); const slug = pathname.split('/')[2] || '';
+  const pathname = usePathname(); const searchParams = useSearchParams(); const router = useRouter(); const slug = pathname.split('/')[2] || '';
   const patientId = slug === 'patients' ? pathname.split('/')[3] : undefined;
   const [data, setData] = useState<WorkspaceData | null>(null); const [error, setError] = useState('');
   const [notice, setNotice] = useState(''); const [modal, setModal] = useState<ModalState>(null);
   const [menuOpen, setMenuOpen] = useState(false); const [refreshing, setRefreshing] = useState(false);
+  const [confirmSignOut, setConfirmSignOut] = useState(false);
+  const [notificationRequest, setNotificationRequest] = useState(0);
   const loading = useRef(false); const requestSequence = useRef(0); const openedTarget = useRef('');
   const load = useCallback(async (background = true, force = false): Promise<WorkspaceData | null> => {
     if (loading.current && !force) return null; loading.current = true; const sequence = ++requestSequence.current;
@@ -53,10 +55,10 @@ export function ClinicApp({ localNotificationPort }: { localNotificationPort?: s
     catch (e) { if (sequence === requestSequence.current) setError(e instanceof Error ? e.message : 'The work list could not be updated.'); return null; }
     finally { if (sequence === requestSequence.current) loading.current = false; }
   }, []);
-  const reload = useCallback(async () => { await load(true, true); }, [load]);
+  const reload = useCallback(async () => { await load(true); }, [load]);
   useNotificationUpdates(data?.user.mustChangePassword ? undefined : data?.user.id, localNotificationPort, reload);
   useEffect(() => { void load(false); }, [load]);
-  useEffect(() => { if (data && (data.user.mustChangePassword && slug !== 'account' || !slug)) router.replace(data.user.mustChangePassword ? '/clinic/account' : `/clinic/${HOME[data.user.role as Role]}`); }, [data?.user.role, slug, router]);
+  useEffect(() => { if (data && (data.user.mustChangePassword && slug !== 'account' || !slug || slug === 'sources')) router.replace(data.user.mustChangePassword ? '/clinic/account' : `/clinic/${HOME[data.user.role as Role]}`); }, [data?.user.role, slug, router]);
   useEffect(() => { setMenuOpen(false); setModal(null); }, [pathname]);
   useEffect(() => {
     const refresh = () => { if (document.visibilityState === 'visible') void load(); };
@@ -78,7 +80,7 @@ export function ClinicApp({ localNotificationPort }: { localNotificationPort?: s
   useEffect(() => { if (!notice) return; const timer = setTimeout(() => setNotice(''), 9000); return () => clearTimeout(timer); }, [notice]);
   useEffect(() => {
     if (!data) return;
-    const params = new URLSearchParams(window.location.search); const id = params.get('open'); const visit = params.get('visit');
+    const id = searchParams.get('open'); const visit = searchParams.get('visit');
     const key = `${pathname}:${id || visit || ''}`;
     if ((!id && !visit) || openedTarget.current === key) return;
     openedTarget.current = key;
@@ -96,14 +98,28 @@ export function ClinicApp({ localNotificationPort }: { localNotificationPort?: s
       else { const v = data.visits.find(v => v.id === visit && v.billingReadyAt); if (v) setModal({ kind: 'invoice-new', visit: v, patient: data.patients.find(p => p.id === v.patientId) }); }
     }
     if (slug === 'review' && ['registration', 'reviewer'].includes(data.user.role)) { const row = data.reviews.find(r => r.id === id); if (row) setModal({ kind: row.kind === 'identity' && row.state === 'open' ? 'review' : 'issue-info', row }); }
-  }, [data, pathname, slug]);
+  }, [data, pathname, slug, searchParams, notificationRequest]);
   async function saved(message: string, next?: NonNullable<ModalState>) {
     const fresh = await load(true, true);
-    if (next?.row?.id && fresh) next = { ...next, row: [...fresh.invoices, ...fresh.visits, ...fresh.labs].find(r => r.id === next!.row.id) || next.row };
+    if (next?.row?.id) {
+      const id = next.row.id;
+      const current = fresh && [...fresh.invoices, ...fresh.visits, ...fresh.labs].find(row => row.id === id);
+      if (current) next = { ...next, row: current };
+      else if (next.kind === 'lab' && modal?.kind === 'lab' && modal.row?.id === id) next = undefined;
+    }
     setModal(next || null); setNotice(message);
   }
   async function refresh() { setRefreshing(true); await load(true, true); setRefreshing(false); }
-  async function logout() { try { await clinicRequest('logout', {}); window.location.assign('/login'); } catch { setError('Sign-out did not finish. Try again.'); } }
+  async function logout() { await clinicRequest('logout', {}); window.location.assign('/login'); }
+  async function openNotification(href: string) {
+    const target = new URL(href, window.location.origin);
+    if (target.origin !== window.location.origin || !target.pathname.startsWith('/clinic/')) return;
+    const fresh = await load(true, true);
+    if (!fresh) throw new Error('The latest record could not be loaded.');
+    openedTarget.current = '';
+    if (target.pathname === pathname && target.search === window.location.search) setNotificationRequest(value => value + 1);
+    router.push(target.pathname + target.search, { scroll: false });
+  }
   if (!data) return <WorkspaceLoading error={error} onRetry={() => { setError(''); void load(false); }} />;
   const role = data.user.role as Role;
   const nav = NAV.filter(n => n.roles.includes(role));
@@ -118,7 +134,7 @@ export function ClinicApp({ localNotificationPort }: { localNotificationPort?: s
   const label = slug === 'account' ? 'Account & password' : slug === 'patients' && patientId ? 'Patient details' : slug === 'access' ? 'My responsibilities' : selected?.label === 'Identity checks' && role === 'reviewer' ? 'Record checks' : selected?.label || 'Your work';
   function navigation() {
     return <><nav aria-label="Staff navigation">{nav.map(n => <Link key={n.slug} href={`/clinic/${n.slug}`} className={`nav-item ${slug === n.slug ? 'active' : ''}`} aria-current={slug === n.slug ? 'page' : undefined}><n.icon size={18} strokeWidth={1.6} /><span>{n.slug === 'review' && role === 'reviewer' ? 'Record checks' : n.slug === 'laboratory' && role === 'doctor' ? 'Tests & reports' : n.label}</span></Link>)}</nav>
-      <div className="sidebar-bottom"><div className="staff-scope"><span className="scope-dot" />{ROLE_NAMES[role]} workspace</div><Link href="/clinic/account" className="nav-item"><ShieldCheck size={18} />Account &amp; password</Link><Link href="/clinic/access" className="nav-item"><ShieldCheck size={18} />My responsibilities</Link><button className="nav-item logout" onClick={logout}><LogOut size={18} />Sign out</button></div></>;
+      <div className="sidebar-bottom"><div className="staff-scope"><span className="scope-dot" />{ROLE_NAMES[role]} workspace</div><Link href="/clinic/account" className="nav-item"><ShieldCheck size={18} />Account &amp; password</Link><Link href="/clinic/access" className="nav-item"><ShieldCheck size={18} />My responsibilities</Link><button className="nav-item logout" onClick={() => { setMenuOpen(false); setConfirmSignOut(true); }}><LogOut size={18} />Sign out</button></div></>;
   }
   let content: ReactNode;
   if (!permitted) content = <><h1>Access restricted</h1><Empty title="This work belongs to another staff role" action={<Link className="button button-secondary" href={`/clinic/${HOME[role]}`}>Return to my work</Link>} /></>;
@@ -127,20 +143,26 @@ export function ClinicApp({ localNotificationPort }: { localNotificationPort?: s
   else if (slug === 'prices') content = <ServicePrices data={data} reload={reload} notify={setNotice} onPriceSaved={priceList => setData(current => current ? { ...current, priceList } : current)} />;
   else if (slug === 'reception') content = <Reception data={data} open={open} />;
   else if (slug === 'visits') content = <Consultations data={data} open={open} />;
-  else if (slug === 'laboratory') content = <Laboratory data={data} open={open} />;
+  else if (slug === 'laboratory') content = <Laboratory data={data} open={open} stale={!!error} />;
   else if (slug === 'billing') content = <Billing data={data} open={open} />;
   else if (slug === 'patients' && patientId) {
     const patient = data.patients.find(p => p.id === patientId);
-    content = patient ? <><Link className="back-link" href={`/clinic/${HOME[role]}`}><ArrowLeft size={16} />Back to my work</Link><div className="page-heading"><div><h1>{patient.name}</h1><p>Patient {patient.id}</p></div>{['registration', 'reviewer'].includes(role) && <button className="button button-secondary" onClick={() => open({ kind: 'patient-edit', row: patient })}>Correct patient details</button>}</div><IdentityCard patient={patient} doctor={data.staff.find(d => d.id === patient.doctorId)?.name} />{['registration', 'doctor', 'reviewer'].includes(role) && <p className="patient-contact">Contact number: {patient.phone || 'Not provided'}</p>}<PatientWork data={data} patient={patient} open={open} /><details className="form-disclosure"><summary>Record details</summary><p>Source: {patient.source || 'Clinic registration'} · Version {patient.version} · Updated {formatTime(patient.updatedAt)}</p></details></> : <Empty title="This patient is not available to your account" />;
+    content = patient ? <>
+      <Link className="back-link" href={`/clinic/${HOME[role]}`}><ArrowLeft size={16} />Back to my work</Link>
+      <IdentityCard pageHeading patient={patient} doctor={data.staff.find(d => d.id === patient.doctorId)?.name} />
+      {['registration', 'doctor', 'reviewer'].includes(role) && <p className="patient-contact">Contact number: {patient.phone || 'Not provided'}</p>}
+      {['registration', 'reviewer'].includes(role) && <div className="patient-actions"><button className="button button-secondary" onClick={() => open({ kind: 'patient-edit', row: patient })}>Correct patient details</button></div>}
+      <PatientWork data={data} patient={patient} open={open} />
+      <details className="form-disclosure"><summary>Record details</summary><p>Source: {patient.source || 'Clinic registration'} · Version {patient.version} · Updated {formatTime(patient.updatedAt)}</p></details>
+    </> : <Empty title="This patient is not available to your account" />;
     if (role === 'registration' && patient) content = <>{content}<PatientAccess key={patient.id} patientId={patient.id} notify={setNotice} /></>;
   } else if (slug === 'patients') content = <><PageHeading title={role === 'doctor' ? 'Assigned patients' : 'Patient register'} description={role === 'doctor' ? 'Patient records assigned to your care.' : 'Find the patient identification available for your work.'} /><PatientRegister data={data} open={open} /></>;
   else if (slug === 'review') content = <ReviewWork data={data} open={open} />;
-  else if (slug === 'sources') content = <Sources data={data} open={open} />;
   else if (slug === 'staff') content = <StaffAccounts data={data} open={open} />;
   else if (slug === 'history') content = <ActivityHistory data={data} />;
-  else if (slug === 'reports') content = <AnalyticsWorkspace data={data} reload={reload} notify={setNotice} />;
+  else if (slug === 'reports') content = <AnalyticsWorkspace data={data} reload={async () => { if (!await load(true, true)) throw new Error('The report was updated, but the figures could not be reloaded. Refresh the work list.'); }} notify={setNotice} />;
   else content = <><PageHeading title="My responsibilities" description={ROLE_DETAILS[role]} /><Panel title={ROLE_NAMES[role]}><p>{ROLE_DETAILS[role]}</p><p>Use your own account. Check patient identity before recording information. Explain corrections so the earlier record and the reason for the change remain available.</p></Panel><Panel title="When another department needs to act"><p>Finish your part of the task and save it. The responsible staff member receives the handoff in their work list and notifications. You can view the information your role needs; changes belonging to another department remain with that department.</p></Panel></>;
-  return <div className="clinic-shell staff-app"><aside className="sidebar"><div className="sidebar-brand"><Brand small /><span>Clinic workspace</span></div>{navigation()}</aside><div className="clinic-frame"><header className="app-topbar"><div className="topbar-left"><button className="icon-button mobile-menu" aria-label="Open staff navigation" onClick={() => setMenuOpen(true)}><Menu size={20} /></button><span>{ROLE_NAMES[role]}</span><ChevronRight size={13} /><strong>{label}</strong></div><div className="topbar-tools"><button className="icon-button refresh-control" title="Refresh work lists" aria-label="Refresh work lists" disabled={refreshing} onClick={refresh}><RefreshCw size={17} className={refreshing ? 'spinning' : ''} /></button><StaffNotifications notifications={data.notifications || []} reload={reload} /><div className="staff-identity"><span className="avatar">{data.user.name.replace('Dr. ', '').split(' ').map((s: string) => s[0]).slice(0, 2).join('')}</span><span><strong>{data.user.name}</strong><small>{ROLE_NAMES[role]}</small></span></div></div></header><main className="workspace-sheet"><div className="workspace-content">{error && <div className="form-error refresh-error" role="alert"><p>{error} Your last loaded records remain visible.</p><button className="text-button" onClick={refresh}>Try again</button></div>}{content}<footer className="workspace-footer"><span>CareRecord · {ROLE_NAMES[role]} workspace</span><span>Updated {formatTime(data.generatedAt)}</span></footer></div></main></div>{notice && <div className="toast" role="status">{notice}<button className="text-button" aria-label="Dismiss confirmation" onClick={() => setNotice('')}>Dismiss</button></div>}{menuOpen && <Dialog title="CareRecord navigation" onClose={() => setMenuOpen(false)}><div className="mobile-navigation">{navigation()}</div></Dialog>}{modal && <WorkflowDialog key={`${modal.kind}:${modal.row?.id || modal.patient?.id || 'new'}`} modal={modal} data={data} onClose={() => setModal(null)} onSaved={saved} />}</div>;
+  return <div className="clinic-shell staff-app"><aside className="sidebar"><div className="sidebar-brand"><Brand small /><span>Clinic workspace</span></div>{navigation()}</aside><div className="clinic-frame"><header className="app-topbar"><div className="topbar-left"><button className="icon-button mobile-menu" aria-label="Open staff navigation" onClick={() => setMenuOpen(true)}><Menu size={20} /></button><span>{ROLE_NAMES[role]}</span><ChevronRight size={13} /><strong>{label}</strong></div><div className="topbar-tools"><button className="icon-button refresh-control" title="Refresh work lists" aria-label="Refresh work lists" disabled={refreshing} onClick={refresh}><RefreshCw size={17} className={refreshing ? 'spinning' : ''} /></button><StaffNotifications notifications={data.notifications || []} reload={reload} onOpenTask={openNotification} /><div className="staff-identity"><span className="avatar">{data.user.name.replace('Dr. ', '').split(' ').map((s: string) => s[0]).slice(0, 2).join('')}</span><span><strong>{data.user.name}</strong><small>{ROLE_NAMES[role]}</small></span></div></div></header><main className="workspace-sheet"><div className="workspace-content">{error && <div className="form-error refresh-error" role="alert"><p>{error} Showing the last loaded records from {formatTime(data.generatedAt)}.</p><button className="text-button" onClick={refresh}>Try again</button></div>}{content}<footer className="workspace-footer"><span>CareRecord · {ROLE_NAMES[role]} workspace</span><span>Updated {formatTime(data.generatedAt)}</span></footer></div></main></div>{notice && <div className="toast" role="status">{notice}<button className="text-button" aria-label="Dismiss confirmation" onClick={() => setNotice('')}>Dismiss</button></div>}{menuOpen && <Dialog title="CareRecord navigation" onClose={() => setMenuOpen(false)}><div className="mobile-navigation">{navigation()}</div></Dialog>}{confirmSignOut && <SignOutDialog onClose={() => setConfirmSignOut(false)} onConfirm={logout} />}{modal && <WorkflowDialog key={`${modal.kind}:${modal.row?.id || modal.patient?.id || 'new'}:${modal.row?.version ?? ''}`} modal={modal} data={data} onClose={() => setModal(null)} onSaved={saved} />}</div>;
 }
 
 export function PageHeading({ title, description, action }: { title: string; description: string; action?: ReactNode }) {

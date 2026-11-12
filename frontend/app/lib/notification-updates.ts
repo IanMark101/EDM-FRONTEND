@@ -31,7 +31,17 @@ export function useNotificationUpdates(staffId: string | undefined, localPort: s
       }
     }
 
-    function connect() {
+    async function connect() {
+      // HTTP polling still refreshes records while live updates reconnect.
+      // Check reachability first instead of repeatedly opening failed sockets.
+      try {
+        const health = await fetch('/api/health', { cache: 'no-store', signal: AbortSignal.timeout(5000) });
+        if (!health.ok) throw new Error('Clinic service is reconnecting');
+      } catch {
+        if (!stopped) { timer = setTimeout(() => void connect(), delay); delay = Math.min(delay * 2, 30_000); }
+        return;
+      }
+      if (stopped) return;
       const current = new WebSocket(endpoint);
       socket = current;
       current.onopen = () => {
@@ -47,12 +57,12 @@ export function useNotificationUpdates(staffId: string | undefined, localPort: s
           void catchUp();
           return;
         }
-        timer = setTimeout(connect, delay);
+        timer = setTimeout(() => void connect(), delay);
         delay = Math.min(delay * 2, 30_000);
       };
     }
 
-    connect();
+    void connect();
     return () => {
       stopped = true;
       clearTimeout(timer);
