@@ -93,4 +93,4 @@ export function IdentityCard({ patient, doctor, pageHeading = false }: { patient
 }
 export const formatMoney = (cents: number) => new Intl.NumberFormat('en-PH', { style: 'currency', currency: 'PHP' }).format(cents / 100);
 export function formatDate(value: string) { if (!value) return '—'; const d = new Date(value.length === 10 ? `${value}T12:00:00+08:00` : value); return Number.isNaN(d.getTime()) ? '—' : new Intl.DateTimeFormat('en-GB', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'Asia/Taipei' }).format(d); }
-export function formatTime(value: string) { if (!value) return '—'; const d = new Date(value); return Number.isNaN(d.getTime()) ? '—' : new Intl.DateTimeFormat('en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Taipei' }).format(d); }
+export function formatTime(value: string, showSeconds = false) { if (!value) return '—'; const d = new Date(value); return Number.isNaN(d.getTime()) ? '—' : new Intl.DateTimeFormat('en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit', second: showSeconds ? '2-digit' : undefined, timeZone: 'Asia/Taipei' }).format(d); }

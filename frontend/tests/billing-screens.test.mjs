@@ -98,6 +98,29 @@ test('an unavailable laboratory work list is distinguished from an empty connect
   assert.ok(connected.includes('No reports in this list'));
 });
 
+test('doctor review shows precise laboratory timestamps and a separate optional return time', () => {
+  const report = { id: 'L-1', patientId: patient.id, visitId: visit.id, testName: 'Blood glucose', status: 'approved',
+    collectedAt: '2026-01-01T16:30:00.000Z', approvedAt: '2026-01-01T16:30:27.643Z', doctorReview: {}, measurements: [], history: [] };
+  const workspace = { ...data(), user: { id: 'D-1', role: 'doctor' }, labs: [report] };
+  const html = render({ kind: 'lab', row: report }, workspace);
+  assert.ok(html.includes('Sample collected')); assert.ok(html.includes('00:30:00'));
+  assert.ok(html.includes('Report approved')); assert.ok(html.includes('00:30:27'));
+  assert.ok(html.includes('type="date"')); assert.ok(html.includes('type="time"'));
+  assert.ok(html.includes('Return time (optional)'));
+});
+
+test('saved doctor review displays a return time and preserves earlier date-only records', () => {
+  const approvedAt = '2026-01-02T03:00:00Z';
+  const report = { id: 'L-1', patientId: patient.id, visitId: visit.id, testName: 'Blood glucose', status: 'approved', approvedAt,
+    doctorReview: { reportApprovedAt: approvedAt, reviewedAt: approvedAt, reviewedBy: 'Doctor', plan: 'Reviewed.', followUpDate: '2026-01-10' }, measurements: [], history: [] };
+  const workspace = { ...data(), user: { id: 'D-1', role: 'doctor' }, labs: [report] };
+  const earlier = render({ kind: 'lab', row: report }, workspace);
+  assert.ok(earlier.includes('Return appointment 10 Jan 2026'));
+  assert.ok(!earlier.includes('Return appointment 10 Jan 2026 at'));
+  const scheduled = render({ kind: 'lab', row: { ...report, doctorReview: { ...report.doctorReview, followUpTime: '09:30' } } }, workspace);
+  assert.ok(scheduled.includes('Return appointment 10 Jan 2026 at 09:30'));
+});
+
 test('signing out requires a separate explicit confirmation and offers a way to stay', () => {
   let confirmed = false;
   const html = renderToStaticMarkup(React.createElement(SignOutDialog, { onClose() {}, async onConfirm() { confirmed = true; } }));

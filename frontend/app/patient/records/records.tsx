@@ -8,7 +8,7 @@ import { SignOutDialog } from '@/components/ui/sign-out-dialog';
 type RecordSet = {
   patient: { id: string; name: string };
   visits: { id: string; date: string; doctor: string }[];
-  labs: { id: string; visitId: string; testName: string; collectedAt: string; releasedAt: string; followUpDate?: string; measurements: { name: string; result: string; unit: string; reference?: string; flag?: string }[] }[];
+  labs: { id: string; visitId: string; testName: string; collectedAt: string; releasedAt: string; followUpDate?: string; followUpTime?: string; measurements: { name: string; result: string; unit: string; reference?: string; flag?: string }[] }[];
   bills: { id: string; visitId: string; date: string; total: number; paid: number; items: { description: string; amount: number }[]; payments: { amount: number; method: string; at: string }[] }[];
 };
 const tabs = [{ id: 'visits', title: 'Visits', Icon: CalendarDays }, { id: 'labs', title: 'Lab results', Icon: FlaskConical }, { id: 'bills', title: 'Bills & payments', Icon: ReceiptText }] as const;
@@ -57,9 +57,9 @@ export function PatientRecords() {
         {tab === 'visits' && (data.visits.length ? <div className="portal-list">{data.visits.map(visit => <article className="portal-record" key={visit.id}><h2>{formatDate(visit.date)}</h2><p>{visit.doctor} · Visit {visit.id}</p><span className="status status-good">Completed</span></article>)}</div> : <Empty title="No completed visits yet" detail="Your completed visits will appear here." />)}
         {tab === 'labs' && (data.labs.length ? <div className="portal-list">{data.labs.map(lab => <details className="portal-record" key={lab.id}>
           <summary><strong>{lab.testName}</strong><span>Released {formatTime(lab.releasedAt)} · Visit {lab.visitId}</span></summary>
-          <p>Sample collected {formatTime(lab.collectedAt)}</p>
+          <p>Sample collected {formatTime(lab.collectedAt, true)}</p>
           <dl className="portal-values">{lab.measurements.map((row, index) => <div key={`${row.name}:${index}`}><dt>{row.name}{row.reference && <small>Reference {row.reference}</small>}</dt><dd>{row.result} {row.unit === 'Not applicable' ? '' : row.unit}{row.flag && <small>{row.flag}</small>}</dd></div>)}</dl>
-          {lab.followUpDate && <p>Follow-up date {formatDate(lab.followUpDate)}</p>}
+          {lab.followUpDate && <p>Return appointment {formatDate(lab.followUpDate)}{lab.followUpTime ? ` at ${lab.followUpTime}` : ''}</p>}
         </details>)}</div> : <Empty title="No released results yet" detail="A laboratory result appears here after your doctor reviews and releases it." />)}
         {tab === 'bills' && (data.bills.length ? <div className="portal-list">{data.bills.map(bill => <details className="portal-record" key={bill.id}>
           <summary><strong>Bill {bill.id}</strong><span>{formatDate(bill.date)} · Visit {bill.visitId}</span></summary>
