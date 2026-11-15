@@ -357,25 +357,19 @@
 .login-coverage { display:flex; flex-wrap:wrap; justify-content:center; align-items:center; gap:10px 22px; margin-top:42px; max-width:430px; color:#d5e1d3; font-size:13px; line-height:1.7; }
 .login-coverage span { white-space:nowrap; }
 .login-story-footer { text-align:center; font-size:12px; line-height:1.7; }
-@media (min-width:761px) and (max-width:1100px) {
+.login-compact-brand { display:none; }
+@media (min-width:1024px) and (max-width:1100px) {
   .login-story { padding:36px 30px 28px; }
   .login-story .login-introduction .login-story-title { font-size:clamp(40px,4.7vw,52px); }
   .login-coverage { gap:12px 18px; }
 }
-@media (max-width:760px) {
-  .login-story { display:flex; align-items:center; padding:26px 24px 28px; min-height:0; }
-  .login-story > .brand { font-size:26px; }
-  .login-story > .login-introduction { padding:24px 0 0; }
-  .login-story .login-introduction .login-story-title { font-size:38px; line-height:1.1; }
-  .login-story .login-introduction > .login-story-description { font-size:14px; max-width:32ch; margin-top:16px; line-height:1.6; }
-  .login-coverage { display:none; }
-  .login-story-footer { display:none; }
-}
-@media (max-width:480px), (max-width:760px) and (max-height:650px) {
-  .login-story { padding:16px 24px; }
-  .login-story > .login-introduction { display:none; }
-  .login-form-side { padding-top:12px; }
-  .login-form-wrap { padding-top:12px; }
+@media (max-width:1023px) {
+  .login-page { grid-template-columns:minmax(0,1fr); }
+  .login-story { display:none; }
+  .login-form-side { min-height:100svh; padding:24px clamp(24px,6vw,48px); }
+  .login-form-wrap { flex-shrink:0; padding:32px 0; }
+  .login-compact-brand { display:block; margin-bottom:32px; }
+  .login-form-side > .back-link { align-self:flex-start; min-height:44px; margin-bottom:0; }
 }
 /* Reporting: overview first, with charts and record detail on demand. */
 .reports-workspace { min-width:0; }

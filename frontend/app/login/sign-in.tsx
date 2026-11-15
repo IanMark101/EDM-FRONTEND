@@ -44,6 +44,7 @@ export function Login({ patient = false }: { patient?: boolean }) {
       <section className="login-form-side">
         <Link href="/" className="back-link"><ArrowLeft size={16} />Back to home</Link>
         <div className="login-form-wrap">
+          <div className="login-compact-brand"><Brand /></div>
           <h1>{patient ? activating ? 'Set up patient access' : 'Patient sign-in' : 'Staff sign-in'}</h1>
           <p>{patient ? activating ? 'Use the patient number and setup code from Registration.' : 'Use your patient number and password.' : 'Use the account assigned to you.'}</p>
           {expired && <p className="notice-inline" role="status">Your session ended. Please sign in again.</p>}
