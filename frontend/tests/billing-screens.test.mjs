@@ -80,9 +80,9 @@ test('older bills remain payable and do not invent missing historical sources', 
   assert.ok(html.includes('references were not recorded')); assert.ok(html.includes('Record payment')); assert.ok(html.includes('100.00'));
 });
 
-test('manager screen shows approved prices and explains that existing bills keep their amounts', () => {
+test('manager screen shows approved prices and laboratory availability controls', () => {
   const html = renderToStaticMarkup(React.createElement(ServicePrices, { data: data(), async reload() {}, notify() {} }));
-  assert.ok(html.includes('Service prices')); assert.ok(html.includes('Clinic Manager')); assert.ok(html.includes('500.00')); assert.ok(html.includes('Saved bills keep their original amounts'));
+  assert.ok(html.includes('Service prices')); assert.ok(html.includes('Clinic Manager')); assert.ok(html.includes('500.00')); assert.ok(html.includes('Edit price'));
   assert.ok(html.includes('Laboratory tests doctors can request'));
   assert.ok(html.includes('Complete blood count')); assert.ok(html.includes('Urinalysis'));
   assert.ok(html.includes('Test requests and billing prices are managed separately'));

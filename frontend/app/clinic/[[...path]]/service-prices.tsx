@@ -37,7 +37,6 @@ export function ServicePrices({ data, reload, notify, onPriceSaved }: { data: Wo
   }
   return <>
     <PageHeading title="Service prices" description="Set the clinic-approved amounts that billing uses for completed services." action={<button type="button" className="button button-primary" disabled={busy} onClick={() => edit()}><Plus size={17} />Add service price</button>} />
-    <p className="notice-inline">You set the prices. Billing uses them to prepare bills and receive payment. Saved bills keep their original amounts when a price changes.</p>
     {!draft && error && <div className="form-error" role="alert"><p>{error}</p><button className="text-button" type="button" disabled={busy} onClick={async () => { await reload(); setError(''); }}>Reload list</button></div>}
     {draft && <section className="service-price-editor" aria-labelledby="price-editor-title"><h2 id="price-editor-title">{draft.id ? 'Edit service price' : 'Add service price'}</h2><form onSubmit={save}>
       <div className="form-grid"><Field label="Service type"><select value={draft.kind} disabled={busy} onChange={event => { const kind = event.target.value as Draft['kind']; setDraft({ ...draft, kind, name: kind === 'consultation' ? 'Consultation' : '' }); }}><option value="consultation">Consultation</option><option value="laboratory">Laboratory test</option></select></Field>

@@ -1,7 +1,7 @@
 'use client';
 import { useState, type ReactNode } from 'react';
 import Link from 'next/link';
-import { Plus, ArrowRight, Search, CircleCheck, Clock3, ShieldCheck } from 'lucide-react';
+import { Plus, ArrowRight } from 'lucide-react';
 import { Empty, Panel, SearchField, Status, formatDate, formatTime, formatMoney, PageHeading } from '@/components/ui/common';
 import { needsDoctorReview } from '@shared/clinical';
 import { ROLE_NAMES, clinicDay, labProblems, type Role } from '@shared/domain';
@@ -40,11 +40,9 @@ export function Reception({ data, open }: Props) {
       { label: 'Patient / visit', render: v => person(data, v) }, { label: 'Doctor', render: v => data.staff.find(d => d.id === v.doctorId)?.name || 'Assigned doctor' },
       { label: 'Checked in', render: v => v.checkedInAt ? formatTime(v.checkedInAt) : formatDate(v.date) }, { label: 'Progress', render: v => <Status value={v.status} /> },
       { label: 'Action', action: true, render: v => v.status === 'waiting' ? action('Cancel check-in', () => open({ kind: 'cancel-checkin', row: v })) : <Link className="text-link" href={`/clinic/patients/${v.patientId}`}>View patient<ArrowRight size={14} /></Link> },
-    ]} /><div className="next-step-note"><UsersHint />Check-in sends the visit to the assigned doctor. Registration does not enter consultation notes.</div></> : <PatientRegister data={data} open={open} />}
+    ]} /></> : <PatientRegister data={data} open={open} />}
   </>;
 }
-function UsersHint() { return <ShieldCheck size={17} />; }
-
 export function PatientRegister({ data, open }: Props) {
   const [search, setSearch] = useState('');
   const rows = data.patients.filter(p => matches(search, p.name, p.id, p.dob));
@@ -67,7 +65,6 @@ export function Consultations({ data, open }: Props) {
     {toReview.length > 0 && <div className="report-review-prompt"><span>{toReview.some(l => l.urgency === 'urgent') ? 'Urgent reports need your review.' : `${toReview.length} approved ${toReview.length === 1 ? 'report needs' : 'reports need'} your review.`}</span><Link className="text-link" href="/clinic/laboratory">Review reports<ArrowRight size={15} /></Link></div>}
     <WorkTabs value={tab} onChange={setTab} tabs={[{ id: 'active', label: 'Waiting & in progress', count: active.length }, { id: 'completed', label: 'Completed consultations' }]} /><Toolbar search={query} setSearch={setQuery} label="Find a patient or visit" count={rows.length} />
     <VisitTable data={data} rows={rows} open={open} />
-    <div className="next-step-note"><CircleCheck size={17} />Complete the consultation when your notes are ready. Billing then receives the visit; test requests are sent separately.</div>
 
   </>;
 }
@@ -90,7 +87,6 @@ export function Laboratory({ data, open, stale = false }: Props & { stale?: bool
   return <><PageHeading title={doctor ? 'Tests & reports' : 'Laboratory work'} description={stale ? 'Counts may be out of date while the work list reconnects.' : doctor ? `${needsReview.length} approved ${needsReview.length === 1 ? 'report needs' : 'reports need'} your review and follow-up decision.` : `${pending.length} ${pending.length === 1 ? 'request needs' : 'requests need'} completion or approval.`} action={doctor ? <button className="button button-primary" onClick={() => open({ kind: 'lab-new' })}><Plus size={17} />Request a test</button> : undefined} />
     {stale && <p className="notice-inline" role="status">This work list could not refresh. The records shown may be out of date. It will update when the connection returns.</p>}
     <WorkTabs value={tab} onChange={setTab} tabs={tabs} /><Toolbar search={query} setSearch={setQuery} label="Find a patient or test" count={rows.length} />{stale && !rows.length ? <Empty title="Waiting for the work list to reconnect" detail="We cannot confirm whether there are new requests yet." /> : <LabTable data={data} open={open} rows={rows} />}
-    <div className="next-step-note"><ShieldCheck size={17} />{doctor ? 'Review the approved report and save your follow-up decision. Corrected reports need a new review.' : 'Check the actual panel, sample details and report content before approving. Urgent reports require direct clinician contact.'}</div>
   </>;
 }
 
@@ -119,7 +115,6 @@ export function Billing({ data, open }: Props) {
   const bills = data.invoices.filter(b => (tab === 'outstanding' ? b.paid < b.total : tab === 'paid' ? b.paid >= b.total : true) && matches(query, patientFor(data, b.patientId)?.name, b.id)).sort((a, b) => b.date.localeCompare(a.date));
   const prepare = (v: any) => open({ kind: 'invoice-new', visit: v, patient: patientFor(data, v.patientId) });
   return <><PageHeading title="Billing & payments" description={`${unbilled.length} ${unbilled.length === 1 ? 'visit needs' : 'visits need'} a bill. ${outstanding.length} ${outstanding.length === 1 ? 'bill has' : 'bills have'} a remaining balance.`} />
-    <p className="notice-inline">Charges come from completed consultations and approved tests. The account manager sets their prices; you check the bill and record payment.</p>
     {!data.priceList?.entries.some(price => price.active) && <p className="notice-inline">Ask the account manager to add service prices before preparing new charges. Existing bills can still receive payments.</p>}
     <WorkTabs value={tab} onChange={setTab} tabs={[{ id: 'to-bill', label: 'To bill', count: unbilled.length }, { id: 'outstanding', label: 'Unpaid & partly paid', count: outstanding.length }, { id: 'paid', label: 'Paid bills' }, { id: 'all', label: 'All bills' }]} />
     <Toolbar search={query} setSearch={setQuery} label="Find a patient, visit or bill" count={tab === 'to-bill' ? visits.length : bills.length} />
@@ -128,10 +123,8 @@ export function Billing({ data, open }: Props) {
       { label: 'Services provided', render: v => { const services = data.billingServices.find(s => s.visitId === v.id); return <><span>Consultation</span>{services?.tests.length > 0 && <small>{services.tests.map((t: any) => t.name).join(', ')}</small>}</>; } },
       { label: 'Action', action: true, render: v => action('Prepare bill', () => prepare(v)) },
     ]} /> : <BillTable data={data} open={open} rows={bills} />}
-    <div className="next-step-note"><ReceiptHint />Record the amount received from the patient. Charges and payments remain separate, so partial payments show the correct balance.</div>
   </>;
 }
-function ReceiptHint() { return <CircleCheck size={17} />; }
 function BillTable({ data, rows, open }: Props & { rows: any[] }) {
   return <WorkTable rows={rows} empty="No bills in this list" detail="Try another list or search by the patient's name." columns={[
     { label: 'Patient / bill', render: b => person(data, b) },
@@ -165,7 +158,6 @@ export function ReviewWork({ data, open }: Props) {
     </div>}
     <WorkTabs value={tab} onChange={setTab} tabs={[{ id: 'open', label: 'Needs attention', count: data.reviews.filter(r => r.state === 'open').length }, { id: 'resolved', label: 'Resolved checks' }]} />
     <Toolbar search={query} setSearch={setQuery} label="Find a patient or record problem" count={rows.length} /><ReviewRows data={data} open={open} rows={rows} />
-    {reviewer && <div className="next-step-note"><ShieldCheck size={17} />Laboratory staff finish drafts in Laboratory work and correct approved reports there.</div>}
   </>;
 }
 function ReviewRows({ data, rows, open }: Props & { rows: any[] }) {
@@ -183,6 +175,6 @@ export function StaffAccounts({ data, open }: Props) {
     { label: 'Staff member', render: s => <><strong>{s.name}</strong><small>{s.username}</small></> }, { label: 'Assigned role', render: s => ROLE_NAMES[s.role as Role] },
     { label: 'Account access', render: s => <Status value={s.active ? 'active' : 'inactive'} /> },
     { label: 'Action', action: true, render: s => s.id === data.user.id ? <span className="muted">Your account</span> : action('Manage access', () => open({ kind: 'staff-edit', row: s })) },
-  ]} /><div className="next-step-note"><ShieldCheck size={17} />Changing a role or disabling an account ends its active sessions.</div></>;
+  ]} /></>;
 }
 export { ActivityHistory } from './activity-history';

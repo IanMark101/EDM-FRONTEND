@@ -15,7 +15,7 @@
 }
 @media (prefers-reduced-motion:reduce) { .workspace-start-spinner { animation:none; } }
 
-.staff-app .workspace-content { max-width:1280px; padding:28px 28px 0; }
+.staff-app .workspace-content { max-width:1280px; padding:28px; }
 .staff-app .app-topbar { position:sticky; top:0; height:68px; z-index:30; background:var(--ground); padding-inline:28px; }
 .staff-app .topbar-left { min-width:0; }
 .staff-app .topbar-left strong { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
@@ -28,7 +28,6 @@
 .staff-app .page-heading { margin-bottom:24px; }
 .staff-app .page-heading h1 { font-size:26px; }
 .staff-app .page-heading p { font-size:14px; line-height:1.6; max-width:70ch; }
-.staff-app .workspace-footer { margin-top:32px; padding-top:18px; font-size:12px; }
 .work-tabs { display:flex; gap:24px; max-width:100%; overflow-x:auto; border-bottom:1px solid var(--border); margin-bottom:22px; scrollbar-width:thin; }
 .work-tabs button { position:relative; display:inline-flex; gap:8px; align-items:center; flex:none; min-height:46px; padding:10px 0 14px; border:0; background:transparent; color:var(--muted); font-size:14px; white-space:nowrap; }
 .work-tabs button.active { color:var(--forest); font-weight:600; }
@@ -134,8 +133,6 @@
   .account-form { max-width:none; }
 }
 .list-more { display:flex; justify-content:space-between; align-items:center; margin-top:18px; color:var(--muted); font-size:12px; }
-.next-step-note { display:flex; gap:10px; align-items:flex-start; margin-top:28px; padding:16px 18px; border-radius:8px; background:var(--raised); color:#4b5850; font-size:13px; line-height:1.6; }
-.next-step-note > svg { margin-top:2px; color:var(--sage-dark); }
 .patient-work { margin-top:24px; }
 .recent-reports { margin-top:28px; }
 .patient-actions { display:flex; align-items:center; flex-wrap:wrap; gap:12px; margin-bottom:24px; }
@@ -227,14 +224,14 @@
 @media (max-width:1100px) {
   .staff-app .sidebar { display:none; }
   .staff-app .mobile-menu { display:inline-grid; }
-  .staff-app .workspace-content { padding:26px 24px 0; }
+  .staff-app .workspace-content { padding:26px 24px; }
   .staff-app .app-topbar { padding-inline:24px; }
   .staff-app .task-table .row-action { min-width:150px; }
 }
 @media (max-width:760px) {
   .staff-app .clinic-frame { padding-right:0; padding-bottom:0; }
   .staff-app .workspace-sheet { border-radius:12px 12px 0 0; }
-  .staff-app .workspace-content { padding:24px 18px 0; }
+  .staff-app .workspace-content { padding:24px 18px; }
   .staff-app .app-topbar { height:64px; padding-inline:16px; gap:12px; }
   .staff-app .page-heading { gap:16px; }
   .staff-app .page-heading h1 { font-size:23px; }
@@ -275,8 +272,6 @@
   .quality-strip { gap:18px 12px; }
   .quality-strip span { font-size:12px; }
   .quality-strip strong { font-size:24px; }
-  .next-step-note { margin-top:24px; padding:14px; }
-  .staff-app .workspace-footer { gap:8px; }
   .staff-app .panel { padding:18px 16px; }
   .staff-app .toast { align-items:flex-start; bottom:16px; }
   .staff-app .history-row summary { grid-template-columns:6px minmax(0,1fr); gap:10px; }
