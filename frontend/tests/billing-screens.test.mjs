@@ -116,9 +116,12 @@ test('saved doctor review displays a return time and preserves earlier date-only
   const workspace = { ...data(), user: { id: 'D-1', role: 'doctor' }, labs: [report] };
   const earlier = render({ kind: 'lab', row: report }, workspace);
   assert.ok(earlier.includes('Return appointment 10 Jan 2026'));
+  assert.ok(earlier.includes('Edit return appointment'));
   assert.ok(!earlier.includes('Return appointment 10 Jan 2026 at'));
   const scheduled = render({ kind: 'lab', row: { ...report, doctorReview: { ...report.doctorReview, followUpTime: '09:30' } } }, workspace);
   assert.ok(scheduled.includes('Return appointment 10 Jan 2026 at 09:30'));
+  const laboratory = render({ kind: 'lab', row: report }, { ...workspace, user: { role: 'laboratory' } });
+  assert.ok(!laboratory.includes('Edit return appointment'));
 });
 
 test('signing out requires a separate explicit confirmation and offers a way to stay', () => {

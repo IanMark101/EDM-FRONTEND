@@ -25,7 +25,7 @@ function RecordWorkflowDialog({ modal, data, onClose, onSaved }: WorkflowProps) 
     patientId: initialPatient?.id || '', visitId: modal.visit?.id || row.visitId || [...data.visits].filter(v => v.patientId === initialPatient?.id).sort((a, b) => b.date.localeCompare(a.date))[0]?.id || '',
     name: row.name || '', dob: row.dob || '', phone: row.phone || '', doctorId: row.doctorId || initialPatient?.doctorId || '',
     date: row.date || today(), reason: '', visitReason: row.reason || '', notes: row.notes || '', testName: '', value: row.value || '', unit: row.unit || '', collectedAt: localTime(row.collectedAt),
-    specimen: row.specimen || '', reportComment: row.reportComment || '', urgency: row.urgency || 'routine', contactPerson: row.contact?.person || '', contactMethod: row.contact?.method || '', contactAt: localTime(row.contact?.at), reviewPlan: '', followUpDate: '', followUpTime: '', reviewConfirmed: false,
+    specimen: row.specimen || '', reportComment: row.reportComment || '', urgency: row.urgency || 'routine', contactPerson: row.contact?.person || '', contactMethod: row.contact?.method || '', contactAt: localTime(row.contact?.at), reviewPlan: '', followUpDate: row.doctorReview?.followUpDate || '', followUpTime: row.doctorReview?.followUpTime || '', reviewConfirmed: false,
     reviewed: false, amount: '', method: 'Cash', reference: '', decision: 'keep-separate', confirmedDob: '', evidence: '',
     username: row.username || '', password: '', role: row.role || 'registration', active: row.active ?? true,
   });
@@ -35,6 +35,7 @@ function RecordWorkflowDialog({ modal, data, onClose, onSaved }: WorkflowProps) 
   const [layout, setLayout] = useState(initialLayout);
   const [measurements, setMeasurements] = useState<any[]>(row.measurements?.length ? row.measurements : initialLayout !== 'general' ? templateRows(initialLayout) : []);
   const [error, setError] = useState(''); const [busy, setBusy] = useState(false); const [editing, setEditing] = useState(false); const [checkResult, setCheckResult] = useState<string[] | null>(null);
+  const [editingAppointment, setEditingAppointment] = useState(false);
   const draft = JSON.stringify([form, clinical, structured, layout, measurements]);
   const [initialDraft] = useState(draft);
   const [nextTask, setNextTask] = useState<NonNullable<ModalState> | null>(null);
@@ -66,6 +67,11 @@ function RecordWorkflowDialog({ modal, data, onClose, onSaved }: WorkflowProps) 
         body = { version: row.version, confirmed: form.releaseConfirmed };
         message = 'Laboratory result released to the patient portal.';
       }
+      else if (kind === 'lab' && action === 'return-appointment') {
+        path = `labs/${row.id}/return-appointment`;
+        body = { version: row.version, followUpDate: form.followUpDate, followUpTime: form.followUpTime };
+        message = 'Return appointment saved.';
+      }
       else if (kind === 'lab') { path = `labs/${row.id}${action === 'doctor-review' ? '/doctor-review' : ''}`; body = action === 'doctor-review' ? { version: row.version, plan: form.reviewPlan, followUpDate: form.followUpDate, followUpTime: form.followUpTime, confirmed: form.reviewConfirmed } : { ...form, layout, measurements, contact: { person: form.contactPerson, method: form.contactMethod, at: isoTime(form.contactAt) }, collectedAt: isoTime(form.collectedAt), version: row.version, action }; message = action === 'doctor-review' ? 'Doctor review and follow-up decision saved.' : action === 'save' ? 'Laboratory draft saved.' : 'Report approved. The assigned doctor has been notified.'; }
       else if (kind === 'invoice') { path = `invoices/${row.id}/payment`; body = { amount: form.amount, method: form.method, reference: form.reference, version: row.version }; message = 'Payment recorded. The amount due has been updated.'; }
       else if (kind === 'review') { path = `reviews/${row.id}`; body = form; message = form.decision === 'link' ? 'Identity confirmed and source record linked. The decision is recorded.' : 'Source record kept separate. Your evidence is recorded.'; }
@@ -77,7 +83,7 @@ function RecordWorkflowDialog({ modal, data, onClose, onSaved }: WorkflowProps) 
       if (kind === 'patient-new') next = { kind: 'checkin', patient: { ...form, id: result.id } };
       if (kind === 'invoice-add') next = { kind: 'invoice', row };
       if (kind === 'visit' && action === 'request-test') next = { kind: 'lab-new', patient: initialPatient, visit: row };
-      if (kind === 'lab' && ['doctor-review', 'patient-release'].includes(action)) next = { kind: 'lab', row };
+      if (kind === 'lab' && ['doctor-review', 'patient-release', 'return-appointment'].includes(action)) next = { kind: 'lab', row };
       await onSaved(message, next);
     } catch (e) { setError(e instanceof Error ? e.message : 'The record could not be saved.'); setBusy(false); }
   }
@@ -185,6 +191,18 @@ function RecordWorkflowDialog({ modal, data, onClose, onSaved }: WorkflowProps) 
     const urgentReady = form.urgency !== 'urgent' || !!(form.contactPerson.trim() && form.contactMethod.trim() && form.contactAt);
     const approvalBlocked = !form.reviewed || !urgentReady || check().length > 0 || editing && form.reason.trim().length < 12;
     const review = row.doctorReview || {};
+    const appointmentFields = <div className="form-grid">
+      <Field label="Return appointment date (if scheduled)">
+        <input type="date" value={form.followUpDate} onChange={event => {
+          const date = event.target.value;
+          setForm((current: any) => ({ ...current, followUpDate: date, followUpTime: date ? current.followUpTime : '' }));
+          setError('');
+        }} />
+      </Field>
+      <Field label="Return time (optional)" hint="Clinic time, UTC+8.">
+        <input type="time" step="60" value={form.followUpTime} disabled={!form.followUpDate} onChange={event => set('followUpTime', event.target.value)} />
+      </Field>
+    </div>;
     const approvedReport = <>
       <ReportReadout report={row} />
       <div className="patient-actions">
@@ -197,18 +215,7 @@ function RecordWorkflowDialog({ modal, data, onClose, onSaved }: WorkflowProps) 
         <Field label="Doctor’s review notes">
           <textarea rows={3} required maxLength={3000} value={form.reviewPlan} onChange={event => set('reviewPlan', event.target.value)} />
         </Field>
-        <div className="form-grid">
-          <Field label="Return appointment date (if scheduled)">
-            <input type="date" value={form.followUpDate} onChange={event => {
-              const date = event.target.value;
-              setForm((current: any) => ({ ...current, followUpDate: date, followUpTime: date ? current.followUpTime : '' }));
-              setError('');
-            }} />
-          </Field>
-          <Field label="Return time (optional)" hint="Clinic time, UTC+8.">
-            <input type="time" step="60" value={form.followUpTime} disabled={!form.followUpDate} onChange={event => set('followUpTime', event.target.value)} />
-          </Field>
-        </div>
+        {appointmentFields}
         <label className="check-field">
           <input type="checkbox" checked={form.reviewConfirmed} onChange={event => set('reviewConfirmed', event.target.checked)} />
           <span>I have reviewed this result.</span>
@@ -218,7 +225,16 @@ function RecordWorkflowDialog({ modal, data, onClose, onSaved }: WorkflowProps) 
         <h3>Doctor review saved</h3>
         <p className="clinical-notes">{role === 'doctor' ? review.plan : 'The responsible doctor reviewed this result.'}</p>
         <p className="source-line">{review.reviewedBy} · {formatTime(review.reviewedAt)}</p>
-        {role === 'doctor' && review.followUpDate && <p className="source-line">Return appointment {formatDate(review.followUpDate)}{review.followUpTime ? ` at ${review.followUpTime}` : ''}</p>}
+        {role === 'doctor' && (editingAppointment ? <>
+          {appointmentFields}
+          {footer('Save return appointment', 'return-appointment', <button type="button" className="button button-secondary" disabled={busy} onClick={() => {
+            setForm((current: any) => ({ ...current, followUpDate: review.followUpDate || '', followUpTime: review.followUpTime || '' }));
+            setEditingAppointment(false); setError('');
+          }}>Cancel</button>)}
+        </> : <>
+          {review.followUpDate && <p className="source-line">Return appointment {formatDate(review.followUpDate)}{review.followUpTime ? ` at ${review.followUpTime}` : ''}</p>}
+          <button type="button" className="button button-secondary" onClick={() => setEditingAppointment(true)}>Edit return appointment</button>
+        </>)}
       </section>}
     </>;
     fields = <>{patient && <IdentityCard patient={patient} />}<div className="record-summary"><span>{row.id} · {row.visitId}</span><Status value={row.status}>{role === 'doctor' && row.status === 'approved' ? 'Lab approved' : undefined}</Status></div><h3 className="record-test-name">{row.testName}</h3>{canEdit ? <><MeasurementEditor layout={layout} rows={measurements} setLayout={setLayout} setRows={setMeasurements} />{!measurements.length && layout === 'general' && <><Field label="Result" hint="Enter the result here. Enter its measurement unit separately below."><textarea value={form.value} onChange={e => set('value', e.target.value)} maxLength={3000} rows={3} /></Field><Field label="Result unit"><input value={form.unit === 'Not applicable' ? '' : form.unit} disabled={form.unit === 'Not applicable'} onChange={e => set('unit', e.target.value)} maxLength={80} /></Field><label className="check-field"><input type="checkbox" checked={form.unit === 'Not applicable'} onChange={e => set('unit', e.target.checked ? 'Not applicable' : '')} /><span>No unit applies to this result</span></label></>}<div className="form-grid"><Field label="Sample type" hint="For example: blood or urine."><input value={form.specimen} maxLength={120} onChange={e => set('specimen', e.target.value)} /></Field><Field label="Sample collected on / at" hint="Clinic time, UTC+8."><input type="datetime-local" value={form.collectedAt} onChange={e => set('collectedAt', e.target.value)} /></Field></div><details className="form-disclosure"><summary>Report comment (optional)</summary><Field label="Laboratory comment"><textarea rows={3} maxLength={2000} value={form.reportComment} onChange={e => set('reportComment', e.target.value)} /></Field></details><Field label="Clinician review priority" hint="Use your laboratory's approved procedure to decide whether immediate contact is needed."><select value={form.urgency} onChange={e => set('urgency', e.target.value)}><option value="routine">Routine review</option><option value="urgent">Urgent: clinician contacted</option></select></Field>{form.urgency === 'urgent' && <div className="urgent-handoff"><p>Contact the responsible clinician directly. Record the completed contact before approving.</p><Field label="Staff member contacted"><input maxLength={120} value={form.contactPerson} onChange={e => set('contactPerson', e.target.value)} /></Field><Field label="Contact method"><input maxLength={80} placeholder="Phone / in person" value={form.contactMethod} onChange={e => set('contactMethod', e.target.value)} /></Field><Field label="Contact date and time"><input type="datetime-local" value={form.contactAt} onChange={e => set('contactAt', e.target.value)} /></Field></div>}<button type="button" className="button button-secondary" onClick={() => setCheckResult(check())}><ClipboardCheck size={16} />Check report details</button>{checkResult && <div className={`check-result ${checkResult.length ? 'check-result-warning' : 'check-result-good'}`} role="status">{checkResult.length ? <ul>{checkResult.map(problem => <li key={problem}>{problem}</li>)}</ul> : <p><Check size={16} />Required details are complete. Review the content before approval.</p>}</div>}<label className="check-field"><input type="checkbox" checked={form.reviewed} onChange={e => set('reviewed', e.target.checked)} /><span>I checked the patient, request and report content.</span></label>{editing && <Field label="Reason for correction"><textarea required minLength={12} maxLength={1000} rows={3} value={form.reason} onChange={e => set('reason', e.target.value)} /></Field>}<p className="source-line" id="lab-approval-help">Complete the required details and confirm the report check before approving.</p>{footer(editing ? 'Approve correction' : 'Approve report', editing ? 'correct' : 'approve', !editing ? <button type="submit" name="action" value="save" className="button button-secondary" disabled={busy}>Save draft</button> : undefined, approvalBlocked)}</> : row.status === 'approved' ? approvedReport : <p className="notice-inline">Laboratory staff are completing this report. Result content becomes available after approval.</p>}<p className="source-line">Source: {row.sourceRef}. Report version {row.version || '—'}.</p>{Array.isArray(row.history) && row.history.length > 0 && <details className="form-disclosure"><summary>Earlier approved versions ({row.history.length})</summary>{row.history.map((h: any, i: number) => <div className="previous-version" key={i}><ReportReadout report={h} /><p>Correction: {h.reason}</p><small>{h.changedBy} · {formatTime(h.changedAt)}</small></div>)}</details>}</>;
@@ -284,7 +300,7 @@ function RecordWorkflowDialog({ modal, data, onClose, onSaved }: WorkflowProps) 
     proceed: () => { setNextTask(null); void onSaved('', nextTask); },
     cancel: () => setNextTask(null),
   } : undefined}><form onSubmit={submit}>{fields}
-    {canRelease && <section className="doctor-review"><h3>Patient portal</h3>
+    {canRelease && !editingAppointment && <section className="doctor-review"><h3>Patient portal</h3>
       {row.doctorReview.releasedAt ? <p className="notice-inline">Shared in the patient portal on {formatTime(row.doctorReview.releasedAt)}.</p> : <>
         <p className="form-intro">Share this result to make it visible in the patient’s portal.</p>
         <label className="check-field"><input type="checkbox" checked={!!form.releaseConfirmed} onChange={event => set('releaseConfirmed', event.target.checked)} /><span>I confirm this result is ready to share with the patient.</span></label>
