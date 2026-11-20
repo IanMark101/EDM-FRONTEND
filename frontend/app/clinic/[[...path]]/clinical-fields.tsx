@@ -2,7 +2,7 @@
 import type { ReactNode } from 'react';
 import { Plus, Trash2, Printer } from 'lucide-react';
 import { Field, formatTime } from '@/components/ui/common';
-import { LAB_LAYOUTS, VITAL_FIELDS, templateRows, type Measurement } from '@shared/clinical';
+import { LAB_LAYOUTS, VITAL_FIELDS, VITAL_BOUNDS, templateRows, type Measurement } from '@shared/clinical';
 
 export const emptyClinical = () => ({ structured: true, history: '', allergyStatus: 'unknown', allergies: '', medicines: '', findings: '', assessment: '', plan: '', vitals: {} });
 export function PrintLink({ kind, id, payment, label = 'Print / save PDF' }: { kind: string; id: string; payment?: string; label?: string }) {
@@ -41,9 +41,9 @@ export function ClinicalFields({ value, onChange, children }: { value: any; onCh
         <textarea rows={2} maxLength={5000} value={value.medicines} onChange={e => set('medicines', e.target.value)} />
       </Field>
       <h3 className="form-section-title">Measurements taken during this visit</h3>
-      <div className="form-grid">{VITAL_FIELDS.map(([key, label, unit]) => <Field key={key} label={label} hint={unit}>
+      <div className="form-grid">{VITAL_FIELDS.map(([key, label, unit]) => { const [min, max] = VITAL_BOUNDS[key]; return <Field key={key} label={label} hint={`${unit} (${min}–${max})`}>
         <input inputMode="decimal" value={value.vitals?.[key] || ''} maxLength={10} onChange={e => set('vitals', { ...value.vitals, [key]: e.target.value })} />
-      </Field>)}</div>
+      </Field>; })}</div>
     </details>
   </>;
 }

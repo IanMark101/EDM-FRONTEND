@@ -32,7 +32,7 @@ const { Laboratory } = load(resolve(root, 'app/clinic/[[...path]]/staff-views.ts
 const { SignOutDialog } = load(resolve(root, 'components/ui/sign-out-dialog.tsx'));
 const { AnalyticsWorkspace } = load(resolve(root, 'app/clinic/[[...path]]/analytics-workspace.tsx'));
 const { reportSummary, reportTests } = load(resolve(root, '../shared/analytics.ts'));
-const { clinicDay } = load(resolve(root, '../shared/domain.ts'));
+const { clinicDay, sanitizePhoneInput, cleanPhone } = load(resolve(root, '../shared/domain.ts'));
 const patient = { id: 'P-1', name: 'Practice Patient', dob: '2000-01-01' };
 const visit = { id: 'V-1', patientId: 'P-1', date: '2026-01-02', status: 'signed' };
 const price = { id: 'PRICE-1', name: 'Consultation', kind: 'consultation', amount: 50000, active: true, updatedBy: 'Clinic Manager', updatedAt: '2026-01-01T00:00:00Z' };
@@ -170,4 +170,18 @@ test('the removed file-import dialog has no upload or submission controls', () =
   const html = render({ kind: 'import' }, { ...data(), user: { role: 'laboratory' } });
   assert.ok(html.includes('Record unavailable'));
   assert.ok(!html.includes('type="file"')); assert.ok(!html.includes('Receive records'));
+});
+
+test('patient registration enforces 11-digit Philippine mobile formatting and blocks invalid contact numbers', () => {
+  assert.equal(sanitizePhoneInput('874651616516565161651651651'), '87465161651');
+  assert.throws(() => cleanPhone('87465161651'), /11-digit Philippine mobile number/);
+  const workspace = { ...data(), user: { role: 'registration' }, staff: [{ id: 'D-1', name: 'Dr. Ian Mark Buenaflor', role: 'doctor' }] };
+  const invalidHtml = render({ kind: 'patient-new', row: { name: 'Ana Reyes', dob: '2002-05-15', phone: '87465161651', doctorId: 'D-1' } }, workspace);
+  assert.ok(invalidHtml.includes('Enter an 11-digit Philippine mobile number starting with 09 (or +639).'));
+  assert.match(invalidHtml, /maxLength="16"/i);
+  assert.match(invalidHtml, /<button[^>]*type="submit"[^>]*disabled=""[^>]*>Register patient<\/button>/);
+
+  const validHtml = render({ kind: 'patient-new', row: { name: 'Ana Reyes', dob: '2002-05-15', phone: '0917 123 4567', doctorId: 'D-1' } }, workspace);
+  assert.ok(!validHtml.includes('Enter an 11-digit Philippine mobile number starting with 09 (or +639).'));
+  assert.doesNotMatch(validHtml, /<button[^>]*disabled=""[^>]*>Register patient<\/button>/);
 });
