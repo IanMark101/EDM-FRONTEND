@@ -30,9 +30,10 @@ const { WorkflowDialog } = load(resolve(root, 'app/clinic/[[...path]]/workflow-d
 const { ServicePrices } = load(resolve(root, 'app/clinic/[[...path]]/service-prices.tsx'));
 const { Laboratory } = load(resolve(root, 'app/clinic/[[...path]]/staff-views.tsx'));
 const { SignOutDialog } = load(resolve(root, 'components/ui/sign-out-dialog.tsx'));
+const { OperationsSettings } = load(resolve(root, 'app/clinic/[[...path]]/account-settings.tsx'));
 const { AnalyticsWorkspace } = load(resolve(root, 'app/clinic/[[...path]]/analytics-workspace.tsx'));
 const { reportSummary, reportTests } = load(resolve(root, '../shared/analytics.ts'));
-const { clinicDay, sanitizePhoneInput, cleanPhone } = load(resolve(root, '../shared/domain.ts'));
+const { clinicDay, sanitizePhoneInput, cleanPhone, sanitizeClinicPhoneInput, cleanClinicPhone } = load(resolve(root, '../shared/domain.ts'));
 const patient = { id: 'P-1', name: 'Practice Patient', dob: '2000-01-01' };
 const visit = { id: 'V-1', patientId: 'P-1', date: '2026-01-02', status: 'signed' };
 const price = { id: 'PRICE-1', name: 'Consultation', kind: 'consultation', amount: 50000, active: true, updatedBy: 'Clinic Manager', updatedAt: '2026-01-01T00:00:00Z' };
@@ -239,4 +240,46 @@ test('reception includes unresolved waiting check-ins from earlier clinic days',
   const html = renderToStaticMarkup(React.createElement(Reception, { data: { ...data(), user: { role: 'registration' }, visits: [oldWaiting], staff: [{ id: 'D-1', name: 'Dr. Buenaflor', role: 'doctor' }] }, open() {} }));
   assert.ok(html.includes('1 patient is waiting for consultation.'));
   assert.ok(html.includes('Cancel check-in'));
+});
+
+test('clinic phone sanitizer and validator handle Philippine mobile and landline formats', () => {
+  assert.equal(sanitizeClinicPhoneInput('abc0917 824 5190xyz999'), '0917 824 5190');
+  assert.equal(sanitizeClinicPhoneInput('(032) 496-820099'), '(032) 496-82009');
+  assert.equal(sanitizeClinicPhoneInput('+63 917 824 519099'), '+63 917 824 5190');
+  assert.equal(sanitizeClinicPhoneInput('+63 (32) 496-8200'), '+63 (32) 496-8200');
+  assert.equal(sanitizeClinicPhoneInput('(02) 8123-4567'), '(02) 8123-4567');
+
+  assert.equal(cleanClinicPhone('09178245190'), '0917 824 5190');
+  assert.equal(cleanClinicPhone('+63 917 824 5190'), '0917 824 5190');
+  assert.equal(cleanClinicPhone('032-496-8200'), '(032) 496-8200');
+  assert.equal(cleanClinicPhone('+63 (32) 496-8200'), '(032) 496-8200');
+  assert.equal(cleanClinicPhone('(02) 8123-4567'), '(02) 8123-4567');
+  assert.equal(cleanClinicPhone('+63 2 8123 4567'), '(02) 8123-4567');
+  assert.equal(cleanClinicPhone(''), '');
+
+  for (const bad of ['abc123', '87465161651', '+63 (032) 496-8200', '(032) 000-0000', '(03) 2496-8200', '(032 496-8200']) {
+    assert.throws(() => cleanClinicPhone(bad), /Philippine mobile/);
+  }
+});
+
+test('clinic operations form renders sample placeholders, hints, and DQM phone validation', () => {
+  const renderOps = contact => renderToStaticMarkup(React.createElement(OperationsSettings, {
+    initialProfile: { name: 'CareRecord Clinic', address: 'Poblacion, Cordova, Cebu', contact },
+    initialBackup: null,
+  }));
+
+  const invalidHtml = renderOps('abc123');
+  assert.ok(invalidHtml.includes('e.g. CareRecord Community Clinic - Cordova'));
+  assert.ok(invalidHtml.includes('e.g. M.L. Quezon National Highway, Poblacion, Cordova, Cebu 6017'));
+  assert.ok(invalidHtml.includes('0917 824 5190 or (032) 496-8200'));
+  assert.ok(invalidHtml.includes('Displayed as the official header on printed clinical summaries, laboratory reports and receipts.'));
+  assert.ok(invalidHtml.includes('Street, barangay, municipality/city, province and ZIP code.'));
+  assert.ok(invalidHtml.includes('Enter a valid Philippine mobile (09XXXXXXXXX or +639XXXXXXXXX) or landline ((032) 496-8200 or (02) 8123-4567).'));
+  assert.match(invalidHtml, /<button[^>]*disabled=""[^>]*>Save document details<\/button>/);
+
+  for (const validContact of ['0917 824 5190', '(032) 496-8200']) {
+    const validHtml = renderOps(validContact);
+    assert.doesNotMatch(validHtml, /class="field-error"/);
+    assert.doesNotMatch(validHtml, /<button[^>]*disabled=""[^>]*>Save document details<\/button>/);
+  }
 });
