@@ -86,10 +86,10 @@ export function ClinicApp({ localNotificationPort }: { localNotificationPort?: s
     openedTarget.current = key;
     if (slug === 'visits' && data.user.role === 'doctor') {
       const row = data.visits.find(v => v.id === id);
-      if (row?.status === 'waiting' && row.doctorId === data.user.id) void clinicRequest(`visits/${row.id}`, { action: 'start', version: row.version })
-        .then(() => load(true, true)).then(fresh => { const current = fresh?.visits.find(v => v.id === row.id); if (current) setModal({ kind: 'visit', row: current }); })
-        .catch(e => setError(e instanceof Error ? e.message : 'The consultation could not be started.'));
-      else if (row) setModal({ kind: 'visit', row });
+      if (row) setModal({ kind: 'visit', row });
+
+
+
     }
     if (slug === 'laboratory' && ['doctor', 'laboratory'].includes(data.user.role)) { const row = data.labs.find(l => l.id === id); if (row) setModal({ kind: 'lab', row }); }
     if (slug === 'billing' && data.user.role === 'billing') {

@@ -38,8 +38,8 @@ export function PatientRecords() {
   }, [load]);
   useEffect(() => {
     if (!data) return;
-    const timer = window.setTimeout(() => { setData(null); window.location.assign('/patient?expired=1'); }, 20 * 60_000);
-    return () => window.clearTimeout(timer);
+    let activeAt = Date.now(); const active = () => { activeAt = Date.now(); }; const events = ['pointerdown', 'keydown', 'touchstart', 'wheel']; events.forEach(event => window.addEventListener(event, active, { passive: true })); const timer = window.setInterval(() => { if (Date.now() - activeAt > 20 * 60_000) { setData(null); void clinicRequest('patient-portal/logout', {}).catch(() => {}).finally(() => window.location.assign('/patient?expired=1')); } }, 60_000);
+    return () => { window.clearInterval(timer); events.forEach(event => window.removeEventListener(event, active)); };
   }, [data]);
   async function logout() {
     await clinicRequest('patient-portal/logout', {});

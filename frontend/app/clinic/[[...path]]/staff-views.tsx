@@ -31,7 +31,7 @@ function Toolbar({ search, setSearch, label, count }: { search: string; setSearc
 
 export function Reception({ data, open }: Props) {
   const [tab, setTab] = useState('today'); const [query, setQuery] = useState('');
-  const todays = data.visits.filter(v => v.date === clinicDay());
+  const todays = data.visits.filter(v => v.date === clinicDay() || v.status === 'waiting');
   const waiting = todays.filter(v => v.status === 'waiting').length;
   const rows = todays.filter(v => matches(query, patientFor(data, v.patientId)?.name, v.id)).sort((a, b) => (a.status === 'waiting' ? 0 : 1) - (b.status === 'waiting' ? 0 : 1) || (a.checkedInAt || a.updatedAt).localeCompare(b.checkedInAt || b.updatedAt));
   return <><PageHeading title="Patient reception" description={waiting ? `${waiting} ${waiting === 1 ? 'patient is' : 'patients are'} waiting for consultation.` : 'Find the patient, confirm their details, then check them in for a visit.'} action={<button className="button button-primary" onClick={() => open({ kind: 'patient-new' })}><Plus size={17} />Register patient</button>} />
@@ -50,7 +50,7 @@ export function PatientRegister({ data, open }: Props) {
   return <><Toolbar search={search} setSearch={setSearch} label="Search name, patient number or birth date" count={rows.length} /><WorkTable rows={rows} empty="No matching patients" detail={registration ? 'Check the spelling and birth date before creating another patient record.' : 'Try another name or patient number.'} columns={[
     { label: 'Patient', render: p => person(data, p) }, { label: 'Birth date', render: p => formatDate(p.dob) },
     { label: 'Assigned doctor', render: p => data.staff.find(d => d.id === p.doctorId)?.name || 'Not assigned' },
-    { label: 'Action', action: true, render: p => registration ? action(data.visits.some(v => v.patientId === p.id && v.status === 'waiting') ? 'View check-in' : 'Check in', () => open({ kind: 'checkin', patient: p })) : <Link className="button button-secondary row-button" href={`/clinic/patients/${p.id}`}>Open patient<ArrowRight size={14} /></Link> },
+    { label: 'Action', action: true, render: p => registration ? action(data.visits.some(v => v.patientId === p.id && (v.status === 'waiting' || v.status === 'draft')) ? 'View active visit' : 'Check in', () => open({ kind: 'checkin', patient: p })) : <Link className="button button-secondary row-button" href={`/clinic/patients/${p.id}`}>Open patient<ArrowRight size={14} /></Link> },
   ]} /></>;
 }
 
@@ -79,9 +79,9 @@ function VisitTable({ data, rows, open, patientPage = false }: Props & { rows: a
 export function Laboratory({ data, open, stale = false }: Props & { stale?: boolean }) {
   const doctor = data.user.role === 'doctor';
   const [tab, setTab] = useState(doctor ? 'review' : 'waiting'); const [query, setQuery] = useState('');
-  const pending = data.labs.filter(l => l.status !== 'approved');
+  const pending = data.labs.filter(l => !['approved', 'cancelled'].includes(l.status));
   const needsReview = data.labs.filter(needsDoctorReview);
-  const rows = data.labs.filter(l => (tab === 'review' ? needsDoctorReview(l) : tab === 'waiting' ? l.status !== 'approved' : tab === 'approved' ? l.status === 'approved' && (!doctor || !needsDoctorReview(l)) : true) && matches(query, patientFor(data, l.patientId)?.name, l.testName, l.id))
+  const rows = data.labs.filter(l => (tab === 'review' ? needsDoctorReview(l) : tab === 'waiting' ? !['approved', 'cancelled'].includes(l.status) : tab === 'approved' ? l.status === 'approved' && (!doctor || !needsDoctorReview(l)) : true) && matches(query, patientFor(data, l.patientId)?.name, l.testName, l.id))
     .sort((a, b) => (a.urgency === 'urgent' && needsDoctorReview(a) ? 0 : 1) - (b.urgency === 'urgent' && needsDoctorReview(b) ? 0 : 1) || (tab === 'waiting' || tab === 'review' ? a.updatedAt.localeCompare(b.updatedAt) : b.updatedAt.localeCompare(a.updatedAt)));
   const tabs = [...(doctor ? [{ id: 'review', label: 'Needs your review', count: needsReview.length }] : []), { id: 'waiting', label: doctor ? 'Waiting for laboratory' : 'To complete', count: pending.length }, { id: 'approved', label: doctor ? 'Reviewed reports' : 'Approved reports' }, { id: 'all', label: 'All requests' }];
   return <><PageHeading title={doctor ? 'Tests & reports' : 'Laboratory work'} description={stale ? 'Counts may be out of date while the work list reconnects.' : doctor ? `${needsReview.length} approved ${needsReview.length === 1 ? 'report needs' : 'reports need'} your review and follow-up decision.` : `${pending.length} ${pending.length === 1 ? 'request needs' : 'requests need'} completion or approval.`} action={doctor ? <button className="button button-primary" onClick={() => open({ kind: 'lab-new' })}><Plus size={17} />Request a test</button> : undefined} />
@@ -103,7 +103,7 @@ function LabTable({ data, rows, open, patientPage = false }: Props & { rows: any
       </small>}
     </> },
     { label: 'Updated', render: l => formatDate(l.updatedAt) },
-    { label: 'Action', action: true, render: l => action(data.user.role === 'doctor' && needsDoctorReview(l) ? 'Review report' : data.user.role !== 'laboratory' || l.status === 'approved' ? 'View report' : l.status === 'requested' ? 'Enter result' : 'Finish report', () => open({ kind: 'lab', row: l })) },
+    { label: 'Action', action: true, render: l => action(data.user.role === 'doctor' && needsDoctorReview(l) ? 'Review report' : data.user.role !== 'laboratory' || ['approved', 'cancelled'].includes(l.status) ? 'View report' : l.status === 'requested' ? 'Enter result' : 'Finish report', () => open({ kind: 'lab', row: l })) },
   ]} />;
 }
 

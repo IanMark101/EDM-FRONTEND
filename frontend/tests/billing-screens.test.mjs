@@ -185,3 +185,58 @@ test('patient registration enforces 11-digit Philippine mobile formatting and bl
   assert.ok(!validHtml.includes('Enter an 11-digit Philippine mobile number starting with 09 (or +639).'));
   assert.doesNotMatch(validHtml, /<button[^>]*disabled=""[^>]*>Register patient<\/button>/);
 });
+
+
+test('waiting and draft consultations expose explicit start and cancel controls', () => {
+  const waitingVisit = { id: 'V-W', patientId: patient.id, doctorId: 'D-1', date: '2026-01-02', status: 'waiting', version: 1 };
+  const waitingHtml = render({ kind: 'visit', row: waitingVisit }, { ...data(), user: { id: 'D-1', role: 'doctor' }, visits: [waitingVisit] });
+  assert.ok(waitingHtml.includes('Waiting check-in'));
+  assert.match(waitingHtml, /<button[^>]*value="start"[^>]*>Start consultation<\/button>/);
+
+  const draftVisit = { ...waitingVisit, status: 'draft' };
+  const draftHtml = render({ kind: 'visit', row: draftVisit }, { ...data(), user: { id: 'D-1', role: 'doctor' }, visits: [draftVisit] });
+  assert.ok(draftHtml.includes('Cancel unfinished consultation'));
+  assert.match(draftHtml, /<button[^>]*value="cancel"[^>]*disabled=""[^>]*>Cancel consultation<\/button>/);
+});
+
+test('laboratory modal and queue handle cancellation controls and exclude cancelled labs from pending work', () => {
+  const reqLab = { id: 'L-REQ', patientId: patient.id, visitId: visit.id, testName: 'Blood glucose', status: 'requested', sourceRef: 'LAB-1', version: 1, updatedAt: '2026-01-02T00:00:00Z', measurements: [], history: [] };
+  const draftLab = { ...reqLab, id: 'L-DRF', status: 'draft' };
+  const cancelledLab = { ...reqLab, id: 'L-CAN', status: 'cancelled' };
+
+  assert.ok(render({ kind: 'lab', row: reqLab }, { ...data(), user: { id: 'D-1', role: 'doctor' }, labs: [reqLab] }).includes('Cancel laboratory request'));
+  assert.ok(!render({ kind: 'lab', row: draftLab }, { ...data(), user: { id: 'D-1', role: 'doctor' }, labs: [draftLab] }).includes('Cancel laboratory request'));
+  assert.ok(render({ kind: 'lab', row: draftLab }, { ...data(), user: { id: 'U-LAB', role: 'laboratory' }, labs: [draftLab] }).includes('Cancel laboratory request'));
+
+  const canHtml = render({ kind: 'lab', row: cancelledLab }, { ...data(), user: { id: 'U-LAB', role: 'laboratory' }, labs: [cancelledLab] });
+  assert.ok(canHtml.includes('This laboratory request was cancelled.'));
+  assert.ok(!canHtml.includes('Approve report'));
+
+  const labViewHtml = renderToStaticMarkup(React.createElement(Laboratory, { data: { ...data(), user: { role: 'laboratory' }, labs: [cancelledLab] }, open() {} }));
+  assert.ok(labViewHtml.includes('0 requests need completion or approval.'));
+  assert.ok(labViewHtml.includes('No reports in this list'));
+});
+
+test('invoice modal shows void controls for active payments and hides receipts for voided payments', () => {
+  const row = {
+    id: 'B-PAYS', patientId: patient.id, visitId: visit.id, total: 50000, paid: 20000, items: [{ description: 'Consultation', amount: 50000 }],
+    payments: [
+      { id: 'PAY-LIVE', amount: 20000, method: 'Cash', at: '2026-01-02T01:00:00Z', by: 'Cashier', reference: 'OR-1' },
+      { id: 'PAY-VOID', amount: 10000, method: 'Card', at: '2026-01-02T01:05:00Z', by: 'Cashier', reference: 'AUTH-1', voidedAt: '2026-01-02T02:00:00Z', voidedBy: 'Cashier', voidReason: 'Duplicate swipe reversed.' },
+    ],
+  };
+  const html = render({ kind: 'invoice', row });
+  assert.ok(html.includes('Void payment'));
+  assert.ok(html.includes('payment=PAY-LIVE'));
+  assert.ok(!html.includes('payment=PAY-VOID'));
+  assert.ok(html.includes('Voided by Cashier'));
+  assert.ok(html.includes('Duplicate swipe reversed.'));
+});
+
+test('reception includes unresolved waiting check-ins from earlier clinic days', () => {
+  const { Reception } = load(resolve(root, 'app/clinic/[[...path]]/staff-views.tsx'));
+  const oldWaiting = { id: 'V-OLD-WAIT', patientId: patient.id, doctorId: 'D-1', date: '2025-01-01', status: 'waiting', version: 1, updatedAt: '2025-01-01T00:00:00Z' };
+  const html = renderToStaticMarkup(React.createElement(Reception, { data: { ...data(), user: { role: 'registration' }, visits: [oldWaiting], staff: [{ id: 'D-1', name: 'Dr. Buenaflor', role: 'doctor' }] }, open() {} }));
+  assert.ok(html.includes('1 patient is waiting for consultation.'));
+  assert.ok(html.includes('Cancel check-in'));
+});
