@@ -12,6 +12,7 @@ export function Login({ patient = false }: { patient?: boolean }) {
   const [code, setCode] = useState('');
   useEffect(() => { const query = new URLSearchParams(window.location.search); setPasswordChanged(query.has('passwordChanged')); setExpired(query.has('expired')); }, []);
   const [username, setUsername] = useState(''); const [password, setPassword] = useState(''); const [visible, setVisible] = useState(false); const [busy, setBusy] = useState(false); const [error, setError] = useState('');
+  const activationPwError = patient && activating && password && password.length < 12 ? 'Use at least 12 characters for your portal password.' : '';
   async function submit(event: FormEvent) {
     event.preventDefault(); setBusy(true); setError('');
     try {
@@ -52,18 +53,19 @@ export function Login({ patient = false }: { patient?: boolean }) {
           <form onSubmit={submit}>
             <label className="field" htmlFor="staff-username">
               <span>{patient ? 'Patient number' : 'Username'}</span>
-              <input id="staff-username" autoComplete="username" value={username} onChange={e => setUsername(e.target.value)} required placeholder={patient ? 'Your patient number' : 'Your staff username'} maxLength={80} />
+              <input id="staff-username" autoComplete="username" value={username} onChange={e => setUsername(patient ? e.target.value.toUpperCase().replace(/[^A-Z0-9-]/g, '').slice(0, 40) : e.target.value)} required placeholder={patient ? 'e.g. P-0001' : 'Your staff username'} maxLength={patient ? 40 : 80} />
             </label>
-            {patient && activating && <label className="field" htmlFor="patient-code"><span>Setup code</span><input id="patient-code" value={code} onChange={e => setCode(e.target.value)} required maxLength={64} autoComplete="off" spellCheck={false} /></label>}
+            {patient && activating && <label className="field" htmlFor="patient-code"><span>Setup code</span><input id="patient-code" value={code} onChange={e => setCode(e.target.value.replace(/\s+/g, ''))} required maxLength={64} autoComplete="off" spellCheck={false} /></label>}
             <div className="field">
               <label htmlFor="staff-password">{activating ? 'Choose a password' : 'Password'}</label>
               <div className="password-field">
                 <input id="staff-password" autoComplete={activating ? 'new-password' : 'current-password'} type={visible ? 'text' : 'password'} value={password} onChange={e => setPassword(e.target.value)} minLength={activating ? 12 : undefined} maxLength={200} required />
                 <button type="button" className="icon-button" onClick={() => setVisible(!visible)} aria-label={visible ? 'Hide password' : 'Show password'}>{visible ? <EyeOff size={18} /> : <Eye size={18} />}</button>
               </div>
+              {activationPwError && <small className="field-error" role="alert">{activationPwError}</small>}
             </div>
             {error && <p className="form-error" role="alert">{error}</p>}
-            <button className="button button-primary button-full" disabled={busy}>{busy ? 'Please wait…' : activating ? 'Activate account' : 'Sign in'}<ArrowRight size={16} /></button>
+            <button className="button button-primary button-full" disabled={busy || !!activationPwError}>{busy ? 'Please wait…' : activating ? 'Activate account' : 'Sign in'}<ArrowRight size={16} /></button>
           </form>
           <div className="login-assurance"><ShieldCheck size={16} /><span>{patient ? 'Your account shows records for your patient number.' : 'Your assigned role controls access to clinic records.'}</span></div>
           {patient && <button type="button" className="text-button patient-login-switch" disabled={busy} onClick={() => { setActivating(!activating); setError(''); setPassword(''); setCode(''); setVisible(false); }}>{activating ? 'Back to patient sign-in' : 'Have a setup code?'}</button>}

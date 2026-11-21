@@ -33,7 +33,9 @@ const { SignOutDialog } = load(resolve(root, 'components/ui/sign-out-dialog.tsx'
 const { OperationsSettings } = load(resolve(root, 'app/clinic/[[...path]]/account-settings.tsx'));
 const { AnalyticsWorkspace } = load(resolve(root, 'app/clinic/[[...path]]/analytics-workspace.tsx'));
 const { reportSummary, reportTests } = load(resolve(root, '../shared/analytics.ts'));
-const { clinicDay, sanitizePhoneInput, cleanPhone, sanitizeClinicPhoneInput, cleanClinicPhone } = load(resolve(root, '../shared/domain.ts'));
+const { clinicDay, sanitizePhoneInput, cleanPhone, sanitizeClinicPhoneInput, cleanClinicPhone, sanitizeNamePartInput, sanitizeDecimalInput, sanitizeUsernameInput, splitPersonName, composePersonName, validatePayment } = load(resolve(root, '../shared/domain.ts'));
+const { vitalErrors, cleanLabUnit, labResultError } = load(resolve(root, '../shared/clinical.ts'));
+const { ClinicalFields } = load(resolve(root, 'app/clinic/[[...path]]/clinical-fields.tsx'));
 const patient = { id: 'P-1', name: 'Practice Patient', dob: '2000-01-01' };
 const visit = { id: 'V-1', patientId: 'P-1', date: '2026-01-02', status: 'signed' };
 const price = { id: 'PRICE-1', name: 'Consultation', kind: 'consultation', amount: 50000, active: true, updatedBy: 'Clinic Manager', updatedAt: '2026-01-01T00:00:00Z' };
@@ -282,4 +284,73 @@ test('clinic operations form renders sample placeholders, hints, and DQM phone v
     assert.doesNotMatch(validHtml, /class="field-error"/);
     assert.doesNotMatch(validHtml, /<button[^>]*disabled=""[^>]*>Save document details<\/button>/);
   }
+});
+
+test('structured patient registration enforces first and last names and composes compound surnames', () => {
+  const workspace = { ...data(), user: { role: 'registration' }, staff: [{ id: 'D-1', name: 'Dr. Ian Mark Buenaflor', role: 'doctor' }] };
+  const singleNameHtml = render({ kind: 'patient-new', row: { name: 'Maria', dob: '1988-06-14', doctorId: 'D-1' } }, workspace);
+  assert.ok(singleNameHtml.includes('First name'));
+  assert.ok(singleNameHtml.includes('Middle name (optional)'));
+  assert.ok(singleNameHtml.includes('Last name'));
+  assert.ok(singleNameHtml.includes('Suffix (optional)'));
+  assert.match(singleNameHtml, /<button[^>]*disabled=""[^>]*>Register patient<\/button>/);
+
+  const compoundHtml = render({ kind: 'patient-new', row: { name: 'Maria Clara De la Cruz', dob: '1988-06-14', doctorId: 'D-1' } }, workspace);
+  assert.ok(compoundHtml.includes('Standardized record name: <strong>Maria Clara De la Cruz</strong>'));
+  assert.doesNotMatch(compoundHtml, /<button[^>]*disabled=""[^>]*>Register patient<\/button>/);
+});
+
+test('DQM input sanitizers, clinical vitals, UCUM lab dropdowns, billing, and staff forms enforce constraints', () => {
+  assert.equal(sanitizeNamePartInput('123  Maria   Clara, Jr.'), 'Maria Clara Jr.');
+  assert.equal(sanitizeDecimalInput('12.345e+6', 2, 7), '12.34');
+  assert.equal(sanitizeUsernameInput('Dr.Buenaflor!@# '), 'dr.buenaflor');
+  assert.deepEqual(splitPersonName('Maria Clara De la Cruz Jr.'), { title: '', firstName: 'Maria', middleName: 'Clara', lastName: 'De la Cruz', suffix: 'Jr.' });
+  assert.equal(composePersonName({ title: 'Dr.', firstName: 'Ian Mark', lastName: 'Buenaflor' }), 'Dr. Ian Mark Buenaflor');
+  assert.ok(vitalErrors({ temperature: '365', systolic: '90', diastolic: '120' }).temperature);
+  assert.ok(vitalErrors({ systolic: '90', diastolic: '120' }).systolic);
+
+  const labWorkspace = { ...data(), user: { id: 'U-LAB', role: 'laboratory' } };
+  const glucoseRow = { id: 'L-GLU', patientId: patient.id, visitId: visit.id, testName: 'Blood glucose', status: 'requested', sourceRef: 'LAB-1', version: 1, updatedAt: '2026-01-02T00:00:00Z', measurements: [], history: [] };
+  const glucoseHtml = render({ kind: 'lab', row: glucoseRow }, labWorkspace);
+  assert.match(glucoseHtml, /<option value="mg\/dL" selected="">mg\/dL<\/option>/);
+  assert.ok(!glucoseHtml.includes('type="text" value="mg/dL"'));
+
+  const badLabHtml = render({
+    kind: 'lab',
+    row: {
+      id: 'L-BAD', patientId: patient.id, visitId: visit.id, testName: 'Custom test', status: 'draft', layout: 'general',
+      collectedAt: '2026-01-02T02:00:00.000Z', sourceRef: 'LAB-2', version: 1, updatedAt: '2026-01-02T02:00:00Z',
+      measurements: [{ name: 'Glucose', result: '185 mg/dL', unit: 'dL/mg', reference: '', flag: '' }], history: [],
+    },
+  }, labWorkspace);
+  assert.ok(badLabHtml.includes('Choose a standard laboratory unit'));
+  assert.ok(badLabHtml.includes('Enter a numeric result (e.g. 92, 5.6, &lt;5, or 2-4) without repeating the unit.'));
+  assert.match(badLabHtml, /<button[^>]*disabled=""[^>]*>Approve report<\/button>/);
+
+  const vitalsHtml = renderToStaticMarkup(React.createElement(ClinicalFields, {
+    value: { structured: true, history: '', allergyStatus: 'none', allergies: '', medicines: '', findings: '', assessment: 'OK', plan: 'Monitor', vitals: { temperature: '365', systolic: '90', diastolic: '120' } },
+    onChange() {},
+  }, null));
+  assert.ok(vitalsHtml.includes('Must be between 25 and 45 °C.'));
+  assert.ok(vitalsHtml.includes('Upper BP must be greater than lower BP.'));
+
+  const visitBlockedHtml = render({
+    kind: 'visit',
+    row: { id: 'V-D', patientId: patient.id, doctorId: 'D-1', date: '2026-01-02', status: 'draft', reason: 'Fever', clinical: { structured: true, allergyStatus: 'none', assessment: 'Fever', plan: 'Rest', vitals: { temperature: '365' } } },
+  }, { ...data(), user: { id: 'D-1', role: 'doctor' } });
+  assert.ok(visitBlockedHtml.includes('Check the highlighted vital signs before saving.'));
+  assert.match(visitBlockedHtml, /<button[^>]*disabled=""[^>]*>Complete consultation<\/button>/);
+
+  const staffHtml = render({ kind: 'staff-new' }, { ...data(), user: { role: 'manager' } });
+  assert.ok(staffHtml.includes('Title (optional)'));
+  assert.ok(staffHtml.includes('First name'));
+  assert.ok(staffHtml.includes('Last name'));
+  assert.ok(staffHtml.includes('3–40 lowercase letters, digits, dots, underscores or hyphens (e.g. dr.santos).'));
+  assert.match(staffHtml, /<button[^>]*disabled=""[^>]*>Create account<\/button>/);
+
+  assert.throws(() => validatePayment('999.00', 50000, 10000), /greater than the amount still due/);
+  assert.equal(validatePayment('400.00', 50000, 10000), 40000);
+  const invoiceFormHtml = render({ kind: 'invoice', row: { id: 'B-1', patientId: patient.id, visitId: visit.id, total: 50000, paid: 10000, payments: [], items: [{ description: 'Consultation', amount: 50000 }] } });
+  assert.ok(invoiceFormHtml.includes('inputMode="decimal"'));
+  assert.match(invoiceFormHtml, /<button[^>]*disabled=""[^>]*>Record payment<\/button>/);
 });
