@@ -325,6 +325,8 @@ test('DQM input sanitizers, clinical vitals, UCUM lab dropdowns, billing, and st
   const glucoseHtml = render({ kind: 'lab', row: glucoseRow }, labWorkspace);
   assert.match(glucoseHtml, /class="unit-picker-trigger"[^>]*role="combobox"[^>]*aria-haspopup="listbox"/);
   assert.ok(glucoseHtml.includes('>mg/dL<'));
+  assert.ok(glucoseHtml.includes('>Choose sample type<'));
+  assert.doesNotMatch(glucoseHtml, /<datalist\b[^>]*id="lab-specimen-options"/);
   assert.doesNotMatch(glucoseHtml, /<select\b[^>]*>(?:(?!<\/select>)[\s\S])*mg\/dL/);
 
   const badLabHtml = render({
