@@ -141,6 +141,9 @@
 .operations-layout { display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1fr); gap:48px; align-items:start; }
 .operation-guidance p { font-size:14px; line-height:1.7; }
 .operation-guidance .report-values > div { padding:12px 0; }
+.presentation-seed-panel { margin-top:36px; padding-top:28px; border-top:1px solid var(--border); max-width:640px; }
+.presentation-seed-panel h2 { font-size:18px; margin:0 0 10px; }
+.presentation-seed-panel .patient-actions { margin-top:16px; margin-bottom:12px; }
 @media (max-width:900px) { .operations-layout { grid-template-columns:1fr; gap:32px; } }
 @media (max-width:640px) {
   .measurement-main { grid-template-columns:minmax(0,1fr) minmax(0,1fr); gap:12px; }

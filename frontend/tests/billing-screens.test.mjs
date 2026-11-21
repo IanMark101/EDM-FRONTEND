@@ -284,6 +284,17 @@ test('clinic operations form renders sample placeholders, hints, and DQM phone v
     assert.doesNotMatch(validHtml, /class="field-error"/);
     assert.doesNotMatch(validHtml, /<button[^>]*disabled=""[^>]*>Save document details<\/button>/);
   }
+  assert.ok(invalidHtml.includes('Presentation sample data'));
+  assert.ok(invalidHtml.includes('Load 35 sample patients'));
+
+  const seededOpsHtml = renderToStaticMarkup(React.createElement(OperationsSettings, {
+    initialProfile: { name: 'CareRecord Clinic', address: 'Poblacion, Cordova, Cebu', contact: '0917 824 5190' },
+    initialBackup: null,
+    initialSeedStatus: { seeded: true, counts: { patients: 35 } },
+  }));
+  assert.ok(seededOpsHtml.includes('35 sample patients currently loaded'));
+  assert.ok(seededOpsHtml.includes('Reload 35 sample patients'));
+  assert.ok(seededOpsHtml.includes('Remove sample data'));
 });
 
 test('structured patient registration enforces first and last names and composes compound surnames', () => {
