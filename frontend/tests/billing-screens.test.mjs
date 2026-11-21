@@ -312,8 +312,9 @@ test('DQM input sanitizers, clinical vitals, UCUM lab dropdowns, billing, and st
   const labWorkspace = { ...data(), user: { id: 'U-LAB', role: 'laboratory' } };
   const glucoseRow = { id: 'L-GLU', patientId: patient.id, visitId: visit.id, testName: 'Blood glucose', status: 'requested', sourceRef: 'LAB-1', version: 1, updatedAt: '2026-01-02T00:00:00Z', measurements: [], history: [] };
   const glucoseHtml = render({ kind: 'lab', row: glucoseRow }, labWorkspace);
-  assert.match(glucoseHtml, /<option value="mg\/dL" selected="">mg\/dL<\/option>/);
-  assert.ok(!glucoseHtml.includes('type="text" value="mg/dL"'));
+  assert.match(glucoseHtml, /class="unit-picker-trigger"[^>]*role="combobox"[^>]*aria-haspopup="listbox"/);
+  assert.ok(glucoseHtml.includes('>mg/dL<'));
+  assert.doesNotMatch(glucoseHtml, /<select\b[^>]*>(?:(?!<\/select>)[\s\S])*mg\/dL/);
 
   const badLabHtml = render({
     kind: 'lab',
@@ -339,7 +340,9 @@ test('DQM input sanitizers, clinical vitals, UCUM lab dropdowns, billing, and st
     row: { id: 'V-D', patientId: patient.id, doctorId: 'D-1', date: '2026-01-02', status: 'draft', reason: 'Fever', clinical: { structured: true, allergyStatus: 'none', assessment: 'Fever', plan: 'Rest', vitals: { temperature: '365' } } },
   }, { ...data(), user: { id: 'D-1', role: 'doctor' } });
   assert.ok(visitBlockedHtml.includes('Check the highlighted vital signs before saving.'));
-  assert.match(visitBlockedHtml, /<button[^>]*disabled=""[^>]*>Complete consultation<\/button>/);
+  assert.match(visitBlockedHtml, /<button(?=[^>]*name="action")(?=[^>]*value="save")[^>]*>Save draft<\/button>/);
+  assert.match(visitBlockedHtml, /<button(?=[^>]*name="action")(?=[^>]*value="request-test")[^>]*>Request test<\/button>/);
+  assert.match(visitBlockedHtml, /<button(?=[^>]*name="action")(?=[^>]*value="sign")(?=[^>]*disabled="")[^>]*>Complete consultation<\/button>/);
 
   const staffHtml = render({ kind: 'staff-new' }, { ...data(), user: { role: 'manager' } });
   assert.ok(staffHtml.includes('Title (optional)'));
