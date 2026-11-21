@@ -1,6 +1,6 @@
 'use client';
 import { useEffect, useId, useRef, useState, type KeyboardEvent } from 'react';
-import { Check, ChevronDown, Search } from 'lucide-react';
+import { Check, ChevronDown } from 'lucide-react';
 import { QUANTITATIVE_LAB_UNITS, SPECIMEN_OPTIONS } from '@shared/clinical';
 
 const SPECIMEN_HINTS: Record<string, string> = {
@@ -43,16 +43,10 @@ export function UnitPicker({ label = 'Unit', value, onChange, disabled = false, 
   const id = useId();
   const root = useRef<HTMLDivElement>(null);
   const trigger = useRef<HTMLButtonElement>(null);
-  const searchInput = useRef<HTMLInputElement>(null);
   const [open, setOpen] = useState(false);
-  const [query, setQuery] = useState('');
   const [active, setActive] = useState(0);
   const expanded = open && !disabled;
-  const search = query.trim().toLocaleLowerCase();
-  const filtered = QUANTITATIVE_LAB_UNITS.filter(unit =>
-    !search || unit.toLocaleLowerCase().includes(search) || (UNIT_HINTS[unit] || '').toLocaleLowerCase().includes(search)
-  );
-  const activeIndex = filtered.length ? Math.min(active, filtered.length - 1) : -1;
+  const activeIndex = Math.min(active, QUANTITATIVE_LAB_UNITS.length - 1);
 
   useEffect(() => {
     if (!expanded) return;
@@ -62,18 +56,12 @@ export function UnitPicker({ label = 'Unit', value, onChange, disabled = false, 
   }, [expanded]);
 
   useEffect(() => {
-    if (!expanded) return;
-    searchInput.current?.focus();
-  }, [expanded]);
-
-  useEffect(() => {
     if (expanded && activeIndex >= 0) {
       document.getElementById(`${id}-option-${activeIndex}`)?.scrollIntoView({ block: 'nearest' });
     }
   }, [expanded, activeIndex, id]);
 
   function openMenu() {
-    setQuery('');
     const idx = QUANTITATIVE_LAB_UNITS.indexOf(value as any);
     setActive(idx >= 0 ? idx : 0);
     setOpen(true);
@@ -82,36 +70,26 @@ export function UnitPicker({ label = 'Unit', value, onChange, disabled = false, 
   function choose(unit: string) {
     onChange(unit);
     setOpen(false);
-    setQuery('');
     trigger.current?.focus();
   }
 
   function onTriggerKeyDown(event: KeyboardEvent<HTMLButtonElement>) {
+    if (event.key === 'Tab') { setOpen(false); return; }
     if (event.key === 'Escape' && expanded) {
       event.preventDefault(); event.stopPropagation(); setOpen(false); return;
     }
-    if (['Enter', ' ', 'ArrowDown', 'ArrowUp'].includes(event.key)) {
+    if (event.key === 'Enter' || event.key === ' ') {
       event.preventDefault();
-      if (!expanded) openMenu();
-    }
-  }
-
-  function onSearchKeyDown(event: KeyboardEvent<HTMLInputElement>) {
-    if (event.key === 'Escape') {
-      event.preventDefault(); event.stopPropagation(); setOpen(false); trigger.current?.focus(); return;
-    }
-    if (event.key === 'Tab') { setOpen(false); return; }
-    if (event.key === 'ArrowDown' || event.key === 'ArrowUp' || event.key === 'Home' || event.key === 'End') {
-      event.preventDefault();
-      if (!filtered.length) return;
-      const next = event.key === 'Home' ? 0 : event.key === 'End' ? filtered.length - 1
-        : Math.max(0, Math.min(filtered.length - 1, Math.max(0, activeIndex) + (event.key === 'ArrowDown' ? 1 : -1)));
-      setActive(next);
+      if (expanded && QUANTITATIVE_LAB_UNITS[activeIndex]) choose(QUANTITATIVE_LAB_UNITS[activeIndex]);
+      else openMenu();
       return;
     }
-    if (event.key === 'Enter' && activeIndex >= 0 && filtered[activeIndex]) {
+    if (['ArrowDown', 'ArrowUp', 'Home', 'End'].includes(event.key)) {
       event.preventDefault();
-      choose(filtered[activeIndex]);
+      if (!expanded) { openMenu(); return; }
+      const next = event.key === 'Home' ? 0 : event.key === 'End' ? QUANTITATIVE_LAB_UNITS.length - 1
+        : Math.max(0, Math.min(QUANTITATIVE_LAB_UNITS.length - 1, activeIndex + (event.key === 'ArrowDown' ? 1 : -1)));
+      setActive(next);
     }
   }
 
@@ -130,13 +108,8 @@ export function UnitPicker({ label = 'Unit', value, onChange, disabled = false, 
         <ChevronDown size={15} aria-hidden="true" />
       </button>
       {expanded && <div className="unit-picker-popover">
-        <div className="unit-picker-search">
-          <Search size={14} aria-hidden="true" />
-          <input ref={searchInput} type="text" value={query} placeholder="Filter unit (e.g. mg/dL, %, /hpf)…"
-            onChange={e => { setQuery(e.target.value); setActive(0); }} onKeyDown={onSearchKeyDown} />
-        </div>
         <ul id={`${id}-list`} className="unit-picker-options" role="listbox" aria-labelledby={`${id}-label`}>
-          {filtered.length ? filtered.map((unit, index) => (
+          {QUANTITATIVE_LAB_UNITS.map((unit, index) => (
             <li key={unit} id={`${id}-option-${index}`} role="option" aria-selected={value === unit}
               className={activeIndex === index ? 'unit-picker-active' : undefined}
               onPointerMove={() => setActive(index)}
@@ -145,7 +118,7 @@ export function UnitPicker({ label = 'Unit', value, onChange, disabled = false, 
               <span><strong>{unit}</strong>{UNIT_HINTS[unit] && <small>{UNIT_HINTS[unit]}</small>}</span>
               {value === unit && <Check size={15} aria-hidden="true" />}
             </li>
-          )) : <li className="unit-picker-empty" role="presentation">No standard UCUM unit matches “{query.trim()}”. Try mg/dL, g/dL, %, or /hpf.</li>}
+          ))}
         </ul>
       </div>}
     </div>
@@ -159,16 +132,10 @@ export function SpecimenPicker({ label = 'Sample type', hint = 'For example: Blo
   const id = useId();
   const root = useRef<HTMLDivElement>(null);
   const trigger = useRef<HTMLButtonElement>(null);
-  const searchInput = useRef<HTMLInputElement>(null);
   const [open, setOpen] = useState(false);
-  const [query, setQuery] = useState('');
   const [active, setActive] = useState(0);
   const expanded = open && !disabled;
-  const search = query.trim().toLocaleLowerCase();
-  const filtered = SPECIMEN_OPTIONS.filter(specimen =>
-    !search || specimen.toLocaleLowerCase().includes(search) || (SPECIMEN_HINTS[specimen] || '').toLocaleLowerCase().includes(search)
-  );
-  const activeIndex = filtered.length ? Math.min(active, filtered.length - 1) : -1;
+  const activeIndex = Math.min(active, SPECIMEN_OPTIONS.length - 1);
 
   useEffect(() => {
     if (!expanded) return;
@@ -178,19 +145,13 @@ export function SpecimenPicker({ label = 'Sample type', hint = 'For example: Blo
   }, [expanded]);
 
   useEffect(() => {
-    if (!expanded) return;
-    searchInput.current?.focus();
-  }, [expanded]);
-
-  useEffect(() => {
     if (expanded && activeIndex >= 0) {
       document.getElementById(`${id}-specimen-${activeIndex}`)?.scrollIntoView({ block: 'nearest' });
     }
   }, [expanded, activeIndex, id]);
 
   function openMenu() {
-    setQuery('');
-    const idx = SPECIMEN_OPTIONS.indexOf(value as any);
+    const idx = SPECIMEN_OPTIONS.findIndex(s => s.toLocaleLowerCase() === (value || '').toLocaleLowerCase());
     setActive(idx >= 0 ? idx : 0);
     setOpen(true);
   }
@@ -198,42 +159,28 @@ export function SpecimenPicker({ label = 'Sample type', hint = 'For example: Blo
   function choose(specimen: string) {
     onChange(specimen);
     setOpen(false);
-    setQuery('');
     trigger.current?.focus();
   }
 
   function onTriggerKeyDown(event: KeyboardEvent<HTMLButtonElement>) {
+    if (event.key === 'Tab') { setOpen(false); return; }
     if (event.key === 'Escape' && expanded) {
       event.preventDefault(); event.stopPropagation(); setOpen(false); return;
     }
-    if (['Enter', ' ', 'ArrowDown', 'ArrowUp'].includes(event.key)) {
+    if (event.key === 'Enter' || event.key === ' ') {
       event.preventDefault();
-      if (!expanded) openMenu();
-    }
-  }
-
-  function onSearchKeyDown(event: KeyboardEvent<HTMLInputElement>) {
-    if (event.key === 'Escape') {
-      event.preventDefault(); event.stopPropagation(); setOpen(false); trigger.current?.focus(); return;
-    }
-    if (event.key === 'Tab') { setOpen(false); return; }
-    if (event.key === 'ArrowDown' || event.key === 'ArrowUp' || event.key === 'Home' || event.key === 'End') {
-      event.preventDefault();
-      if (!filtered.length) return;
-      const next = event.key === 'Home' ? 0 : event.key === 'End' ? filtered.length - 1
-        : Math.max(0, Math.min(filtered.length - 1, Math.max(0, activeIndex) + (event.key === 'ArrowDown' ? 1 : -1)));
-      setActive(next);
+      if (expanded && SPECIMEN_OPTIONS[activeIndex]) choose(SPECIMEN_OPTIONS[activeIndex]);
+      else openMenu();
       return;
     }
-    if (event.key === 'Enter') {
+    if (['ArrowDown', 'ArrowUp', 'Home', 'End'].includes(event.key)) {
       event.preventDefault();
-      if (activeIndex >= 0 && filtered[activeIndex]) choose(filtered[activeIndex]);
-      else if (query.trim()) choose(query.trim());
+      if (!expanded) { openMenu(); return; }
+      const next = event.key === 'Home' ? 0 : event.key === 'End' ? SPECIMEN_OPTIONS.length - 1
+        : Math.max(0, Math.min(SPECIMEN_OPTIONS.length - 1, activeIndex + (event.key === 'ArrowDown' ? 1 : -1)));
+      setActive(next);
     }
   }
-
-  const customCandidate = query.trim();
-  const hasExactMatch = SPECIMEN_OPTIONS.some(s => s.toLocaleLowerCase() === search);
 
   return <div className={`field ${error ? 'field-invalid' : ''}`}>
     <span id={`${id}-label`}>{label}</span>
@@ -248,36 +195,17 @@ export function SpecimenPicker({ label = 'Sample type', hint = 'For example: Blo
         <ChevronDown size={15} aria-hidden="true" />
       </button>
       {expanded && <div className="unit-picker-popover">
-        <div className="unit-picker-search">
-          <Search size={14} aria-hidden="true" />
-          <input ref={searchInput} type="text" value={query} placeholder="Filter or type sample (e.g. Blood, Serum, Urine)…"
-            onChange={e => { setQuery(e.target.value); setActive(0); }} onKeyDown={onSearchKeyDown} />
-        </div>
         <ul id={`${id}-list`} className="unit-picker-options" role="listbox" aria-labelledby={`${id}-label`}>
-          {filtered.map((specimen, index) => (
-            <li key={specimen} id={`${id}-specimen-${index}`} role="option" aria-selected={value === specimen}
+          {SPECIMEN_OPTIONS.map((specimen, index) => (
+            <li key={specimen} id={`${id}-specimen-${index}`} role="option" aria-selected={value.toLocaleLowerCase() === specimen.toLocaleLowerCase()}
               className={activeIndex === index ? 'unit-picker-active' : undefined}
               onPointerMove={() => setActive(index)}
               onMouseDown={e => e.preventDefault()}
               onClick={() => choose(specimen)}>
               <span><strong>{specimen}</strong>{SPECIMEN_HINTS[specimen] && <small>{SPECIMEN_HINTS[specimen]}</small>}</span>
-              {value === specimen && <Check size={15} aria-hidden="true" />}
+              {value.toLocaleLowerCase() === specimen.toLocaleLowerCase() && <Check size={15} aria-hidden="true" />}
             </li>
           ))}
-          {customCandidate && !hasExactMatch && (
-            <li role="option" aria-selected={value === customCandidate}
-              onMouseDown={e => e.preventDefault()}
-              onClick={() => choose(customCandidate)}>
-              <span><strong>Use “{customCandidate}”</strong><small>Custom sample type</small></span>
-            </li>
-          )}
-          {value && !search && (
-            <li role="option" aria-selected={false}
-              onMouseDown={e => e.preventDefault()}
-              onClick={() => choose('')}>
-              <span><small>Clear sample type</small></span>
-            </li>
-          )}
         </ul>
       </div>}
     </div>
